@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Per-process Claude Code env launcher with default args management (global + per-env), interactive picker, shell completion, and env-leak protection. One command to inject provider env (DeepSeek/Kimi/GLM/CCR/...) and start claude.",
   "bin": {
-    "cce": "./bin/cce.js"
+    "cce": "bin/cce.js"
   },
   "files": [
     "bin",
@@ -42,7 +42,7 @@
   "author": "zhouxiaofu",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zhouxiaofu/claude-code-env.git"
+    "url": "git+https://github.com/zhouxiaofu/claude-code-env.git"
   },
   "bugs": {
     "url": "https://github.com/zhouxiaofu/claude-code-env/issues"
