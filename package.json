@@ -1,0 +1,54 @@
+{
+  "name": "@xiaofuzhou/cce",
+  "version": "0.1.0",
+  "description": "Per-process Claude Code env launcher with default args management (global + per-env), interactive picker, shell completion, and env-leak protection. One command to inject provider env (DeepSeek/Kimi/GLM/CCR/...) and start claude.",
+  "bin": {
+    "cce": "./bin/cce.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "schema.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test test/",
+    "start": "node bin/cce.js"
+  },
+  "dependencies": {
+    "cross-spawn": "^7.0.6",
+    "picocolors": "^1.1.1"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "env",
+    "launcher",
+    "cli",
+    "picker",
+    "deepseek",
+    "kimi",
+    "glm",
+    "moonshot",
+    "ccr"
+  ],
+  "license": "MIT",
+  "author": "zhouxiaofu",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zhouxiaofu/claude-code-env.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zhouxiaofu/claude-code-env/issues"
+  },
+  "homepage": "https://github.com/zhouxiaofu/claude-code-env#readme",
+  "publishConfig": {
+    "access": "public"
+  }
+}

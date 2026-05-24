@@ -1,0 +1,16 @@
+node_modules/
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+.env
+.env.local
+coverage/
+.nyc_output/
+
+# never commit real config (contains API keys)
+config.json
+*.config.json
+!schema.json

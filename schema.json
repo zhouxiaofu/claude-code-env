@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "claude-code-env config",
+  "type": "object",
+  "required": ["version", "envs"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Config schema version"
+    },
+    "default": {
+      "type": ["string", "null"],
+      "description": "Env name used when `cce` is invoked without -e/--env. null or empty means no injection."
+    },
+    "args": {
+      "type": "string",
+      "default": "",
+      "description": "Global default claude args (shell-tokenized string). Prepended to every claude launch unless a per-env entry has `argsOverride: true`, or the user passes -A on the CLI. Example: \"--permission-mode bypassPermissions\""
+    },
+    "envs": {
+      "type": "object",
+      "patternProperties": {
+        "^[A-Za-z0-9][A-Za-z0-9._-]*$": {
+          "type": "object",
+          "required": ["env"],
+          "properties": {
+            "description": {
+              "type": "string",
+              "description": "Human-readable description shown in `cce list`"
+            },
+            "env": {
+              "type": "object",
+              "description": "Environment variables to inject into the claude child process. Matches the shape of Claude Code's settings.json `env` block, so values can be copy-pasted directly. Values may contain ${VAR} placeholders resolved from the parent shell env.",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "args": {
+              "type": "string",
+              "default": "",
+              "description": "Per-env default claude args (shell-tokenized string). By default merged onto the global `args`; set `argsOverride: true` to replace the global args instead."
+            },
+            "argsOverride": {
+              "type": "boolean",
+              "default": false,
+              "description": "If true, this env's `args` replace the global `args` entirely. If false (default), they are merged onto the global args (pure concatenation)."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
