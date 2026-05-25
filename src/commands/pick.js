@@ -4,6 +4,7 @@ const config = require('../config');
 const log = require('../util/log');
 const { pick } = require('../util/picker');
 const { parsePickArgs, ParseError } = require('../parser');
+const { t } = require('../i18n');
 
 /**
  * Show the env picker for the loaded config. Returns the chosen env name,
@@ -17,19 +18,19 @@ async function pickFromConfig(cfg) {
   const names = config.listEnvNames(cfg);
 
   if (names.length === 0) {
-    log.error('No envs configured. Run `cce edit` to create one.');
+    log.error(t('list.noEnvs'));
     return null;
   }
 
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    log.error('Interactive picker requires a TTY. Use `cce -e <name>` instead.');
-    log.plain(`  available envs: ${names.join(', ')}`);
+    log.error(t('pick.needTTY'));
+    log.plain(t('pick.availableEnvs', { names: names.join(', ') }));
     return null;
   }
 
   // Skip the menu for a 1-env config — nothing meaningful to pick.
   if (names.length === 1) {
-    log.info(`only env configured: ${names[0]} — using it`);
+    log.info(t('pick.singleEnv', { name: names[0] }));
     return names[0];
   }
 
@@ -44,7 +45,7 @@ async function pickFromConfig(cfg) {
   });
 
   return await pick({
-    title: 'Pick an env to launch claude:',
+    title: t('pick.title'),
     items,
     initialValue: cfg.default || items[0].value,
   });
@@ -68,7 +69,7 @@ async function run(args) {
   const cfg = config.load();
   const chosen = await pickFromConfig(cfg);
   if (!chosen) {
-    log.warn('Cancelled.');
+    log.warn(t('cli.cancelled'));
     return 130;
   }
   // Hand off to the shared launch helper. spawnClaude is async — it returns
@@ -82,6 +83,7 @@ async function run(args) {
     envName: chosen,
     mergeArgs: parsed.mergeArgs,
     overrideArg: parsed.overrideArg,
+    settingsMode: parsed.settingsMode,
     cfg,
   });
   // intentional: no return value → cli.js will not process.exit on us

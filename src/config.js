@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
+const { t } = require('./i18n');
+
 const CONFIG_VERSION = 1;
 
 const KNOWN_ANTHROPIC_VARS = [
@@ -17,6 +19,10 @@ const KNOWN_ANTHROPIC_VARS = [
   'ANTHROPIC_DEFAULT_OPUS_MODEL',
 ];
 
+// How a selected env's `env` reconciles with ~/.claude/settings.json `env`.
+const SETTINGS_MODES = ['override', 'merge-cce', 'merge-claude'];
+const DEFAULT_SETTINGS_MODE = 'override';
+
 function getConfigDir() {
   if (process.env.CCE_CONFIG_HOME) {
     return path.resolve(process.env.CCE_CONFIG_HOME);
@@ -28,11 +34,26 @@ function getConfigPath() {
   return path.join(getConfigDir(), 'config.json');
 }
 
+// Claude Code's own user settings directory. Honors CLAUDE_CONFIG_DIR the same
+// way claude does, so cce reconciles against the file claude actually reads.
+function getClaudeDir() {
+  if (process.env.CLAUDE_CONFIG_DIR) {
+    return path.resolve(process.env.CLAUDE_CONFIG_DIR);
+  }
+  return path.join(os.homedir(), '.claude');
+}
+
+function getClaudeSettingsPath() {
+  return path.join(getClaudeDir(), 'settings.json');
+}
+
 function defaultConfig() {
   return {
     version: CONFIG_VERSION,
     default: null,
+    lang: null,
     args: '',
+    settingsMode: DEFAULT_SETTINGS_MODE,
     envs: {},
   };
 }
@@ -54,7 +75,7 @@ function load() {
   try {
     raw = fs.readFileSync(file, 'utf8');
   } catch (e) {
-    throw new Error(`Failed to read config at ${file}: ${e.message}`);
+    throw new Error(t('config.readFailed', { file, message: e.message }));
   }
   let parsed;
   try {
@@ -62,11 +83,13 @@ function load() {
   } catch (e) {
     const bak = file + '.bak.' + Date.now();
     fs.writeFileSync(bak, raw);
-    throw new Error(
-      `Config at ${file} is not valid JSON: ${e.message}\nA backup of the broken file was saved at ${bak}. Please fix it or run \`cce edit\`.`
-    );
+    throw new Error(t('config.invalidJson', { file, message: e.message, bak }));
   }
   return normalize(parsed);
+}
+
+function normalizeMode(value) {
+  return SETTINGS_MODES.includes(value) ? value : null;
 }
 
 function normalize(cfg) {
@@ -76,22 +99,46 @@ function normalize(cfg) {
     if (typeof cfg.default === 'string' && cfg.default.length > 0) {
       out.default = cfg.default;
     }
+    if (typeof cfg.lang === 'string' && cfg.lang.length > 0) {
+      out.lang = cfg.lang;
+    }
     if (typeof cfg.args === 'string') {
       out.args = cfg.args;
     }
+    const rootMode = normalizeMode(cfg.settingsMode);
+    if (rootMode) out.settingsMode = rootMode;
     if (cfg.envs && typeof cfg.envs === 'object') {
       for (const [name, entry] of Object.entries(cfg.envs)) {
         if (!entry || typeof entry !== 'object') continue;
-        out.envs[name] = {
+        const norm = {
           description: typeof entry.description === 'string' ? entry.description : '',
           env: entry.env && typeof entry.env === 'object' ? { ...entry.env } : {},
           args: typeof entry.args === 'string' ? entry.args : '',
           argsOverride: entry.argsOverride === true,
         };
+        // Per-env settingsMode is optional; null means "inherit the global one".
+        const envMode = normalizeMode(entry.settingsMode);
+        norm.settingsMode = envMode || null;
+        out.envs[name] = norm;
       }
     }
   }
   return out;
+}
+
+// Cheap, never-throwing read of just the `lang` field — used to resolve the UI
+// language before the full config (and its localized errors) is loaded.
+function peekLang() {
+  try {
+    const raw = fs.readFileSync(getConfigPath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.lang === 'string' && parsed.lang) {
+      return parsed.lang;
+    }
+  } catch {
+    /* missing / unreadable / invalid — caller falls back to locale detection */
+  }
+  return null;
 }
 
 function save(cfg) {
@@ -141,24 +188,39 @@ function setDefault(cfg, name) {
     return cfg;
   }
   if (!cfg.envs[name]) {
-    throw new Error(`Env "${name}" does not exist`);
+    throw new Error(t('config.envNotExistSimple', { name }));
   }
   cfg.default = name;
   return cfg;
 }
 
+// Resolve the effective settings mode for a launch. Precedence (high → low):
+//   CLI -m  >  per-env settingsMode  >  global settingsMode  >  default
+function resolveSettingsMode({ cliMode = null, entry = null, cfg = null } = {}) {
+  if (normalizeMode(cliMode)) return normalizeMode(cliMode);
+  if (entry && normalizeMode(entry.settingsMode)) return entry.settingsMode;
+  if (cfg && normalizeMode(cfg.settingsMode)) return cfg.settingsMode;
+  return DEFAULT_SETTINGS_MODE;
+}
+
 module.exports = {
   CONFIG_VERSION,
   KNOWN_ANTHROPIC_VARS,
+  SETTINGS_MODES,
+  DEFAULT_SETTINGS_MODE,
   getConfigDir,
   getConfigPath,
+  getClaudeDir,
+  getClaudeSettingsPath,
   defaultConfig,
   ensureConfigDir,
   load,
   save,
+  peekLang,
   getEnv,
   listEnvNames,
   setEnv,
   removeEnv,
   setDefault,
+  resolveSettingsMode,
 };

@@ -4,9 +4,17 @@ const log = require('./util/log');
 const parser = require('./parser');
 const config = require('./config');
 const launcher = require('./launcher');
+const settings = require('./settings');
 const argsUtil = require('./util/args');
+const i18n = require('./i18n');
+const { t } = i18n;
 
 async function run(argv) {
+  // Resolve UI language up front: CCE_LANG env > config `lang` > OS locale > en.
+  let configLang = null;
+  try { configLang = config.peekLang(); } catch { /* ignore */ }
+  i18n.setLang(i18n.resolveLang({ configLang }));
+
   let parsed;
   try {
     parsed = parser.parse(argv);
@@ -53,6 +61,7 @@ async function runSubcommand(name, args) {
     case 'edit':       return require('./commands/edit').run(args);
     case 'use':        return require('./commands/use').run(args);
     case 'current':    return require('./commands/current').run(args);
+    case 'lang':       return require('./commands/lang').run(args);
     case 'pick':       return await require('./commands/pick').run(args);
     case 'completion': return require('./commands/completion').run(args);
     case 'help':       return require('./commands/help').run();
@@ -62,7 +71,7 @@ async function runSubcommand(name, args) {
   }
 }
 
-async function runLaunch({ envName: envArg, mergeArgs, overrideArg }) {
+async function runLaunch({ envName: envArg, mergeArgs, overrideArg, settingsMode }) {
   const cfg = config.load();
   let envName = envArg || cfg.default || null;
 
@@ -70,7 +79,7 @@ async function runLaunch({ envName: envArg, mergeArgs, overrideArg }) {
   // to something that no longer exists, warn and fall through to the picker
   // fallback below. An explicit `-e ghost` still errors hard inside launchClaudeWithEnv.
   if (envName && !envArg && !config.getEnv(cfg, envName)) {
-    log.warn(`default env "${envName}" does not exist in config (fix with \`cce use <name>\` or \`cce edit\`)`);
+    log.warn(t('cli.defaultMissing', { name: envName }));
     envName = null;
   }
 
@@ -79,25 +88,27 @@ async function runLaunch({ envName: envArg, mergeArgs, overrideArg }) {
     const { pickFromConfig } = require('./commands/pick');
     envName = await pickFromConfig(cfg);
     if (!envName) {
-      log.warn('Cancelled.');
+      log.warn(t('cli.cancelled'));
       process.exit(130);
     }
   }
 
-  return launchClaudeWithEnv({ envName, mergeArgs, overrideArg, cfg });
+  return launchClaudeWithEnv({ envName, mergeArgs, overrideArg, settingsMode, cfg });
 }
 
 /**
  * Spawn claude with the env named `envName` (or no injection if null),
- * applying the args-merging rules from src/util/args.js.
+ * applying the args-merging rules from src/util/args.js and reconciling the
+ * env into a temp settings file passed via `claude --settings`.
  *
  * @param {object} opts
  * @param {string|null} opts.envName
- * @param {string[]=}   opts.mergeArgs   array of -a values (default [])
+ * @param {string[]=}   opts.mergeArgs    array of -a values (default [])
  * @param {string|null=} opts.overrideArg the -A value, or null if not used
- * @param {object=}     opts.cfg         pre-loaded config (optional, saves a re-read)
+ * @param {string|null=} opts.settingsMode CLI -m mode, or null to inherit config
+ * @param {object=}     opts.cfg          pre-loaded config (optional, saves a re-read)
  */
-function launchClaudeWithEnv({ envName, mergeArgs = [], overrideArg = null, cfg = null }) {
+function launchClaudeWithEnv({ envName, mergeArgs = [], overrideArg = null, settingsMode = null, cfg = null }) {
   if (!cfg) cfg = config.load();
 
   let entry = null;
@@ -105,30 +116,54 @@ function launchClaudeWithEnv({ envName, mergeArgs = [], overrideArg = null, cfg 
     entry = config.getEnv(cfg, envName);
     if (!entry) {
       const available = config.listEnvNames(cfg).join(', ') || '(none)';
-      log.error(`Env "${envName}" does not exist. Available: ${available}`);
-      log.warn('Run `cce edit` to add an env, or `cce list` to see existing ones.');
+      log.error(t('cli.envNotExist', { name: envName, available }));
+      log.warn(t('cli.envNotExistHint'));
       process.exit(1);
     }
   } else {
-    log.warn('No env injected — launching claude as-is.');
+    log.warn(t('cli.noEnvInjected'));
   }
 
   const claudeBin = launcher.findClaudeBin();
   if (!claudeBin) {
-    log.error('Could not find the `claude` executable.');
-    log.plain('  • Install Claude Code: https://docs.claude.com/en/docs/claude-code/quickstart');
-    log.plain('  • Or set CCE_CLAUDE_BIN to the full path of your claude binary.');
+    log.error(t('cli.claudeNotFound'));
+    log.plain(t('cli.claudeNotFoundInstall'));
+    log.plain(t('cli.claudeNotFoundBin'));
     process.exit(127);
   }
 
-  const childEnv = launcher.buildChildEnv(entry, process.env);
+  const childEnv = launcher.buildChildEnv(process.env);
 
-  const claudeArgs = argsUtil.buildClaudeArgs({
-    globalArgs: cfg.args || '',
-    envEntry: entry,
-    mergeArgs,
-    overrideArg,
-  });
+  // Reconcile the env into a temp settings file (claude --settings). Sweep any
+  // orphans from crashed sessions first. Only created when there's something to
+  // write; spawnClaude deletes it on exit.
+  settings.sweepOrphans();
+  const mode = config.resolveSettingsMode({ cliMode: settingsMode, entry, cfg });
+  let tempSettingsFile = null;
+  const settingsArgs = [];
+  if (entry) {
+    const prep = settings.prepareSettings({ entry, mode, parentEnv: process.env });
+    tempSettingsFile = prep.file;
+    if (prep.file) {
+      settingsArgs.push('--settings', prep.file);
+    }
+    if (prep.neutralized.length > 0) {
+      log.info(t('settings.leakWarn', {
+        count: prep.neutralized.length,
+        keys: prep.neutralized.join(', '),
+      }));
+    }
+  }
+
+  const claudeArgs = [
+    ...settingsArgs,
+    ...argsUtil.buildClaudeArgs({
+      globalArgs: cfg.args || '',
+      envEntry: entry,
+      mergeArgs,
+      overrideArg,
+    }),
+  ];
 
   launcher.spawnClaude({
     claudeBin,
@@ -136,6 +171,8 @@ function launchClaudeWithEnv({ envName, mergeArgs = [], overrideArg = null, cfg 
     env: childEnv,
     envName: envName || '(none)',
     entry,
+    mode: entry ? mode : null,
+    tempSettingsFile,
   });
 }
 

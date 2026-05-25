@@ -13,10 +13,21 @@
       "type": ["string", "null"],
       "description": "Env name used when `cce` is invoked without -e/--env. null or empty means no injection."
     },
+    "lang": {
+      "type": ["string", "null"],
+      "enum": ["en", "zh-CN", null],
+      "description": "UI language for cce output (help, warnings, errors, prompts). null = auto-detect from OS locale. Overridden by the CCE_LANG env var; set persistently with `cce lang <en|zh-CN|auto>`."
+    },
     "args": {
       "type": "string",
       "default": "",
       "description": "Global default claude args (shell-tokenized string). Prepended to every claude launch unless a per-env entry has `argsOverride: true`, or the user passes -A on the CLI. Example: \"--permission-mode bypassPermissions\""
+    },
+    "settingsMode": {
+      "type": "string",
+      "enum": ["override", "merge-cce", "merge-claude"],
+      "default": "override",
+      "description": "Global default for how a selected env's `env` reconciles with ~/.claude/settings.json's `env` (cce never edits settings.json; it builds a temp file passed to `claude --settings`). override: this env fully wins, stale anthropic keys in settings.json are neutralized. merge-cce: union, this env wins on conflicts. merge-claude: union, settings.json wins on conflicts. Overridden per-env by `envs.<name>.settingsMode` and per-run by the -m/--merge-mode flag."
     },
     "envs": {
       "type": "object",
@@ -45,6 +56,11 @@
               "type": "boolean",
               "default": false,
               "description": "If true, this env's `args` replace the global `args` entirely. If false (default), they are merged onto the global args (pure concatenation)."
+            },
+            "settingsMode": {
+              "type": "string",
+              "enum": ["override", "merge-cce", "merge-claude"],
+              "description": "Per-env override of how this env's `env` reconciles with ~/.claude/settings.json's `env`. Omit to inherit the global `settingsMode`. override: this env fully wins (stale anthropic keys neutralized). merge-cce: union, this env wins. merge-claude: union, settings.json wins."
             }
           },
           "additionalProperties": false

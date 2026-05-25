@@ -1,11 +1,26 @@
 'use strict';
 
+const { t } = require('./i18n');
+
+// CLI tokens for -m / --merge-mode → internal settings mode names.
+function toMergeMode(val) {
+  switch (val) {
+    case 'override': return 'override';
+    case 'cce':
+    case 'merge-cce': return 'merge-cce';
+    case 'claude':
+    case 'merge-claude': return 'merge-claude';
+    default: return null;
+  }
+}
+
 const SUBCOMMANDS = new Set([
   'list', 'ls',
   'show',
   'edit',
   'use',
   'current',
+  'lang',
   'pick',
   'completion',
   'help',
@@ -39,30 +54,37 @@ function parse(argv) {
   return parseLaunch(argv);
 }
 
-function launchResult(envName = null, mergeArgs = [], overrideArg = null) {
-  return { kind: 'launch', envName, mergeArgs, overrideArg };
+function launchResult(envName = null, mergeArgs = [], overrideArg = null, settingsMode = null) {
+  return { kind: 'launch', envName, mergeArgs, overrideArg, settingsMode };
 }
 
 function parseLaunch(argv) {
   let envName = null;
   const mergeArgs = [];
   let overrideArg = null;
+  let settingsMode = null;
 
   const setOverride = (val, tok) => {
     if (overrideArg !== null) {
-      throw new ParseError(`${tok} can only be specified once`);
+      throw new ParseError(t('parser.overrideOnce', { tok }));
     }
     if (mergeArgs.length > 0) {
-      throw new ParseError(`-a and -A are mutually exclusive`);
+      throw new ParseError(t('parser.aAndAExclusive'));
     }
     overrideArg = val;
   };
 
   const pushMerge = (val, tok) => {
     if (overrideArg !== null) {
-      throw new ParseError(`-a and -A are mutually exclusive`);
+      throw new ParseError(t('parser.aAndAExclusive'));
     }
     mergeArgs.push(val);
+  };
+
+  const setMode = (val, tok) => {
+    const mode = toMergeMode(val);
+    if (!mode) throw new ParseError(t('parser.invalidMergeMode', { val }));
+    settingsMode = mode;
   };
 
   let i = 0;
@@ -77,7 +99,7 @@ function parseLaunch(argv) {
     if (tok === '-e' || tok === '--env') {
       const next = argv[i + 1];
       if (next === undefined || next.startsWith('-')) {
-        throw new ParseError(`Option ${tok} requires an env name`);
+        throw new ParseError(t('parser.envRequiresName', { tok }));
       }
       envName = next;
       i += 2;
@@ -91,11 +113,28 @@ function parseLaunch(argv) {
       continue;
     }
 
+    // -m <mode> / --merge-mode <mode>
+    if (tok === '-m' || tok === '--merge-mode') {
+      const next = argv[i + 1];
+      if (next === undefined || next.startsWith('-')) {
+        throw new ParseError(t('parser.mergeModeRequiresValue', { tok }));
+      }
+      setMode(next, tok);
+      i += 2;
+      continue;
+    }
+    const modeEq = tok.match(/^(?:--merge-mode|-m)=(.*)$/);
+    if (modeEq) {
+      setMode(modeEq[1], tok);
+      i += 1;
+      continue;
+    }
+
     // -a <value>
     if (tok === '-a') {
       const next = argv[i + 1];
       if (next === undefined) {
-        throw new ParseError(`-a requires a value (e.g. -a "--permission-mode bypassPermissions")`);
+        throw new ParseError(t('parser.aRequiresValue'));
       }
       pushMerge(next, tok);
       i += 2;
@@ -129,15 +168,13 @@ function parseLaunch(argv) {
     }
 
     // Anything else is unknown. Give a helpful migration hint.
-    throw new ParseError(
-      `Unknown option: ${tok}\n` +
-      `cce does not pass unknown flags through to claude.\n` +
-      `Claude args must be wrapped in -a "..." (merge) or -A "..." (override).\n` +
-      `Try: cce -a "${tok}"${argv[i + 1] && !argv[i + 1].startsWith('-') ? ` (and quote the value)` : ''}`
-    );
+    const hint = argv[i + 1] && !argv[i + 1].startsWith('-')
+      ? t('parser.unknownOptionQuoteHint')
+      : '';
+    throw new ParseError(t('parser.unknownOption', { tok, hint }));
   }
 
-  return launchResult(envName, mergeArgs, overrideArg);
+  return launchResult(envName, mergeArgs, overrideArg, settingsMode);
 }
 
 function normalizeSubcommand(name) {
@@ -159,16 +196,22 @@ class ParseError extends Error {
 function parsePickArgs(args) {
   const mergeArgs = [];
   let overrideArg = null;
+  let settingsMode = null;
   let i = 0;
 
   const setOverride = (val, tok) => {
-    if (overrideArg !== null) throw new ParseError(`${tok} can only be specified once`);
-    if (mergeArgs.length > 0) throw new ParseError(`-a and -A are mutually exclusive`);
+    if (overrideArg !== null) throw new ParseError(t('parser.overrideOnce', { tok }));
+    if (mergeArgs.length > 0) throw new ParseError(t('parser.aAndAExclusive'));
     overrideArg = val;
   };
   const pushMerge = (val) => {
-    if (overrideArg !== null) throw new ParseError(`-a and -A are mutually exclusive`);
+    if (overrideArg !== null) throw new ParseError(t('parser.aAndAExclusive'));
     mergeArgs.push(val);
+  };
+  const setMode = (val) => {
+    const mode = toMergeMode(val);
+    if (!mode) throw new ParseError(t('parser.invalidMergeMode', { val }));
+    settingsMode = mode;
   };
 
   while (i < args.length) {
@@ -176,7 +219,7 @@ function parsePickArgs(args) {
 
     if (tok === '-a') {
       const next = args[i + 1];
-      if (next === undefined) throw new ParseError(`-a requires a value`);
+      if (next === undefined) throw new ParseError(t('parser.pickARequiresValue'));
       pushMerge(next);
       i += 2;
       continue;
@@ -192,13 +235,21 @@ function parsePickArgs(args) {
     const AEq = tok.match(/^-A=(.*)$/);
     if (AEq) { setOverride(AEq[1], tok); i++; continue; }
 
-    if (tok === '-e' || tok === '--env' || tok.startsWith('-e=') || tok.startsWith('--env=')) {
-      throw new ParseError(`-e/--env not allowed with \`cce pick\` (the env is chosen via the menu)`);
+    if (tok === '-m' || tok === '--merge-mode') {
+      const next = args[i + 1];
+      if (next === undefined || next.startsWith('-')) throw new ParseError(t('parser.mergeModeRequiresValue', { tok }));
+      setMode(next); i += 2; continue;
     }
-    throw new ParseError(`Unknown option for \`cce pick\`: ${tok} (only -a / -A are allowed)`);
+    const modeEq = tok.match(/^(?:--merge-mode|-m)=(.*)$/);
+    if (modeEq) { setMode(modeEq[1]); i++; continue; }
+
+    if (tok === '-e' || tok === '--env' || tok.startsWith('-e=') || tok.startsWith('--env=')) {
+      throw new ParseError(t('parser.pickNoEnvFlag'));
+    }
+    throw new ParseError(t('parser.pickUnknownOption', { tok }));
   }
 
-  return { mergeArgs, overrideArg };
+  return { mergeArgs, overrideArg, settingsMode };
 }
 
 module.exports = { parse, parsePickArgs, ParseError, SUBCOMMANDS };

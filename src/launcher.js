@@ -6,9 +6,10 @@ const os = require('os');
 const crossSpawn = require('cross-spawn');
 
 const { KNOWN_ANTHROPIC_VARS } = require('./config');
-const { expandEnvVars } = require('./util/expand');
 const { quoteArgs } = require('./util/args');
 const log = require('./util/log');
+const settings = require('./settings');
+const { t } = require('./i18n');
 
 function findClaudeBin() {
   if (process.env.CCE_CLAUDE_BIN) {
@@ -43,42 +44,43 @@ function findClaudeBin() {
   return null;
 }
 
-function buildChildEnv(entry, parentEnv = process.env) {
+// The child's env is the parent env with the known Anthropic vars stripped, so
+// a stale shell export can't shadow the values cce routes through the temp
+// settings file (claude --settings). The actual provider env now lives in that
+// settings file, not in process env — see src/settings.js.
+function buildChildEnv(parentEnv = process.env) {
   const env = { ...parentEnv };
-
-  // Always strip known Anthropic vars first so a previous shell export can't leak through.
   for (const k of KNOWN_ANTHROPIC_VARS) {
     delete env[k];
-  }
-
-  if (entry && entry.env) {
-    for (const [k, v] of Object.entries(entry.env)) {
-      const expanded = expandEnvVars(v, parentEnv);
-      // An empty expanded value means "explicitly unset" — useful for the "official" env.
-      if (expanded === '') {
-        delete env[k];
-      } else {
-        env[k] = expanded;
-      }
-    }
   }
   return env;
 }
 
-function summarizeEnv(envName, entry) {
+function summarizeEnv(envName, entry, mode) {
   if (!entry) {
-    return `no env injected`;
+    return t('launcher.noEnvSummary');
   }
   const e = entry.env || {};
   const parts = [`env=${envName}`];
   if (e.ANTHROPIC_MODEL) parts.push(`model=${e.ANTHROPIC_MODEL}`);
   if (e.ANTHROPIC_BASE_URL) parts.push(`base_url=${e.ANTHROPIC_BASE_URL}`);
+  if (mode) parts.push(`settings=${mode}`);
   return parts.join('  ');
 }
 
-function spawnClaude({ claudeBin, claudeArgs, env, envName, entry }) {
-  log.info(summarizeEnv(envName, entry));
+function spawnClaude({ claudeBin, claudeArgs, env, envName, entry, mode, tempSettingsFile = null }) {
+  log.info(summarizeEnv(envName, entry, mode));
   log.info('$ claude' + (claudeArgs.length ? ' ' + quoteArgs(claudeArgs) : ''));
+
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    settings.cleanupTempSettings(tempSettingsFile);
+  };
+  // Belt-and-suspenders: delete the temp settings file on any process exit,
+  // even ones we don't route through the child handlers below.
+  process.on('exit', cleanup);
 
   const child = crossSpawn(claudeBin, claudeArgs, {
     stdio: 'inherit',
@@ -86,11 +88,13 @@ function spawnClaude({ claudeBin, claudeArgs, env, envName, entry }) {
   });
 
   child.on('error', (err) => {
-    log.error(`Failed to spawn claude: ${err.message}`);
+    cleanup();
+    log.error(t('launcher.spawnFailed', { message: err.message }));
     process.exit(1);
   });
 
   child.on('exit', (code, signal) => {
+    cleanup();
     if (signal) {
       if (process.platform !== 'win32') {
         process.kill(process.pid, signal);

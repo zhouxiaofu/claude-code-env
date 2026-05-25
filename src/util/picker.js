@@ -2,6 +2,7 @@
 
 const readline = require('readline');
 const pc = require('picocolors');
+const { t } = require('../i18n');
 
 // Key sequences. Arrow keys arrive as multi-byte escape sequences.
 const KEY = {
@@ -64,7 +65,7 @@ function pick({ items, title = 'Pick an item:', initialValue = null }) {
         lines.push(`${arrow}${marker} ${label}  ${hint}`);
       }
       lines.push('');
-      lines.push(pc.dim('  ↑/↓ navigate · Enter select · Esc/Ctrl+C cancel'));
+      lines.push(pc.dim(t('picker.hint')));
 
       const frame = lines.join('\n');
       out.write(frame + '\n');

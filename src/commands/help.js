@@ -1,11 +1,12 @@
 'use strict';
 
 const log = require('../util/log');
+const i18n = require('../i18n');
 const pc = log.colors;
 const pkg = require('../../package.json');
 
-function run() {
-  const lines = [
+function helpEn() {
+  return [
     `${pc.bold('cce')} ${pc.dim('v' + pkg.version)} — Claude Code Env Launcher`,
     '',
     pc.bold('USAGE'),
@@ -17,39 +18,111 @@ function run() {
     `  -a "<args>"             Merge claude args with config defaults (repeatable)`,
     `  -A "<args>"             Override config defaults, use only these args`,
     `                          (bare -A at end of command = launch with no args)`,
+    `  -m, --merge-mode <m>    How this env's env reconciles with ~/.claude/settings.json:`,
+    `                          override (default) | cce | claude`,
     `  -h, --help              Show this help`,
     `  -v, --version           Show version`,
     '',
     pc.bold('SUBCOMMANDS'),
     `  list, ls                List all envs`,
-    `  show <name>             Show an env's variables + merged claude args`,
+    `  show <name>             Show an env's variables, settings mode + merged claude args`,
     `  edit                    Open config.json in $EDITOR (add/edit/remove envs by hand)`,
     `  use <name>              Set the default env (or --none to clear)`,
     `  current                 Print the default env name`,
-    `  pick [-a/-A ...]        Interactively pick an env, then launch claude`,
+    `  lang [en|zh-CN|auto]    Show or set the UI language (persists to config)`,
+    `  pick [-a/-A/-m ...]     Interactively pick an env, then launch claude`,
     `  completion <shell>      Output shell completion script (bash|zsh|powershell|fish)`,
     `  help                    Show this help`,
+    '',
+    pc.bold('SETTINGS MERGE MODES') + pc.dim('  (how env reconciles with ~/.claude/settings.json)'),
+    `  override   ${pc.dim('this env fully wins; stale anthropic keys in settings.json are neutralized')}`,
+    `  cce        ${pc.dim('union with settings.json, this env wins on conflicts')}`,
+    `  claude     ${pc.dim('union with settings.json, settings.json wins on conflicts')}`,
+    `  ${pc.dim('Set globally (config `settingsMode`), per-env (`settingsMode`), or per-run (-m).')}`,
+    `  ${pc.dim('cce never edits settings.json — it builds a temp file and runs `claude --settings`.')}`,
     '',
     pc.bold('EXAMPLES'),
     `  cce edit                                                 ${pc.dim('# open config.json to add your first env')}`,
     `  cce use deepseek                                         ${pc.dim('# set deepseek as default')}`,
     `  cce                                                      ${pc.dim('# launch claude (default env + config args)')}`,
     `  cce -e kimi                                              ${pc.dim('# switch env')}`,
+    `  cce -e kimi -m cce                                       ${pc.dim('# merge with settings.json, kimi wins')}`,
     `  cce -e kimi -a "--permission-mode bypassPermissions"     ${pc.dim('# merge extra claude args')}`,
-    `  cce -e kimi -a "-c"                                      ${pc.dim('# pass claude -c (continue) via -a')}`,
     `  cce -e kimi -A "--resume XYZ"                            ${pc.dim('# override all config defaults')}`,
-    `  cce -e kimi -A                                           ${pc.dim('# launch claude with no args at all')}`,
     `  cce pick                                                 ${pc.dim('# interactive env picker')}`,
     '',
     pc.bold('ENVIRONMENT'),
     `  CCE_CONFIG_HOME   Override config dir (default: ~/.claude/cce/)`,
+    `  CLAUDE_CONFIG_DIR Where cce reads claude's settings.json (default: ~/.claude/)`,
     `  CCE_CLAUDE_BIN    Override path to the claude executable`,
+    `  CCE_LANG          UI language for this run (en | zh-CN); overrides config. Persist: \`cce lang\``,
     `  CCE_QUIET=1       Suppress the [cce] startup lines`,
     `  CCE_DEBUG=1       Print stack traces on internal errors`,
     '',
     pc.dim('Config: ~/.claude/cce/config.json'),
-  ];
-  log.plain(lines.join('\n'));
+  ].join('\n');
+}
+
+function helpZh() {
+  return [
+    `${pc.bold('cce')} ${pc.dim('v' + pkg.version)} — Claude Code 环境启动器`,
+    '',
+    pc.bold('用法'),
+    `  cce [选项]                              ${pc.dim('用默认或指定的 env 启动 claude')}`,
+    `  cce <子命令> [参数...]                  ${pc.dim('管理 env')}`,
+    '',
+    pc.bold('启动选项'),
+    `  -e, --env <名称>        本次启动使用指定的 env`,
+    `  -a "<参数>"             把 claude 参数合并到配置默认之上（可重复）`,
+    `  -A "<参数>"             覆盖配置默认，只用这些参数`,
+    `                          （命令末尾裸 -A = 不带任何参数启动）`,
+    `  -m, --merge-mode <m>    本 env 的 env 如何与 ~/.claude/settings.json 合并：`,
+    `                          override（默认）| cce | claude`,
+    `  -h, --help              显示帮助`,
+    `  -v, --version           显示版本`,
+    '',
+    pc.bold('子命令'),
+    `  list, ls                列出所有 env`,
+    `  show <名称>             显示某 env 的变量、合并模式 + 合并后的 claude 参数`,
+    `  edit                    用 $EDITOR 打开 config.json（手动增/改/删 env）`,
+    `  use <名称>              设置默认 env（或 --none 清除）`,
+    `  current                 打印默认 env 名`,
+    `  lang [en|zh-CN|auto]    查看或设置界面语言（持久写入配置）`,
+    `  pick [-a/-A/-m ...]     交互式选择 env，然后启动 claude`,
+    `  completion <shell>      输出 shell 补全脚本（bash|zsh|powershell|fish）`,
+    `  help                    显示帮助`,
+    '',
+    pc.bold('合并模式') + pc.dim('  （env 如何与 ~/.claude/settings.json 合并）'),
+    `  override   ${pc.dim('完全以本 env 为准；settings.json 里的残留 anthropic 键被屏蔽')}`,
+    `  cce        ${pc.dim('与 settings.json 取并集，冲突时本 env 优先')}`,
+    `  claude     ${pc.dim('与 settings.json 取并集，冲突时 settings.json 优先')}`,
+    `  ${pc.dim('可全局设（config 的 `settingsMode`）、按 env 设（`settingsMode`）、或按次设（-m）。')}`,
+    `  ${pc.dim('cce 从不改写 settings.json —— 它生成临时文件并用 `claude --settings` 启动。')}`,
+    '',
+    pc.bold('示例'),
+    `  cce edit                                                 ${pc.dim('# 打开 config.json 添加第一个 env')}`,
+    `  cce use deepseek                                         ${pc.dim('# 把 deepseek 设为默认')}`,
+    `  cce                                                      ${pc.dim('# 启动 claude（默认 env + 配置参数）')}`,
+    `  cce -e kimi                                              ${pc.dim('# 切换 env')}`,
+    `  cce -e kimi -m cce                                       ${pc.dim('# 与 settings.json 合并，kimi 优先')}`,
+    `  cce -e kimi -a "--permission-mode bypassPermissions"     ${pc.dim('# 合并额外 claude 参数')}`,
+    `  cce -e kimi -A "--resume XYZ"                            ${pc.dim('# 覆盖所有配置默认参数')}`,
+    `  cce pick                                                 ${pc.dim('# 交互式选择 env')}`,
+    '',
+    pc.bold('环境变量'),
+    `  CCE_CONFIG_HOME   覆盖配置目录（默认：~/.claude/cce/）`,
+    `  CLAUDE_CONFIG_DIR cce 从哪里读 claude 的 settings.json（默认：~/.claude/）`,
+    `  CCE_CLAUDE_BIN    覆盖 claude 可执行文件路径`,
+    `  CCE_LANG          本次运行的界面语言（en | zh-CN）；高于配置。持久设置：\`cce lang\``,
+    `  CCE_QUIET=1       隐藏 [cce] 启动提示行`,
+    `  CCE_DEBUG=1       内部错误时打印堆栈`,
+    '',
+    pc.dim('配置文件：~/.claude/cce/config.json'),
+  ].join('\n');
+}
+
+function run() {
+  log.plain(i18n.getLang() === 'zh-CN' ? helpZh() : helpEn());
   return 0;
 }
 

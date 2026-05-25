@@ -2,6 +2,7 @@
 
 const config = require('../config');
 const log = require('../util/log');
+const { t } = require('../i18n');
 const pc = log.colors;
 
 function run() {
@@ -9,14 +10,14 @@ function run() {
   const names = config.listEnvNames(cfg);
 
   if (names.length === 0) {
-    log.warn('No envs configured. Run `cce edit` to create one.');
+    log.warn(t('list.noEnvs'));
     return 0;
   }
 
   const defaultName = cfg.default;
   const nameWidth = Math.max(...names.map((n) => n.length));
 
-  log.plain(pc.bold('Available envs:'));
+  log.plain(pc.bold(t('list.available')));
   for (const name of names) {
     const marker = name === defaultName ? pc.green('* ') : '  ';
     const padded = name.padEnd(nameWidth);
@@ -30,14 +31,14 @@ function run() {
   if (defaultName) {
     if (!cfg.envs[defaultName]) {
       log.plain(
-        pc.dim(`Default: ${defaultName}  `) +
-        pc.yellow(`⚠ does not exist — fix with \`cce use <name>\` or \`cce edit\``)
+        pc.dim(t('list.defaultLabel', { name: defaultName }) + '  ') +
+        pc.yellow(t('list.defaultMissingWarn'))
       );
     } else {
-      log.plain(pc.dim(`Default: ${defaultName}  (use \`cce use <name>\` to change)`));
+      log.plain(pc.dim(t('list.defaultLabel', { name: defaultName }) + '  ' + t('list.defaultChangeHint')));
     }
   } else {
-    log.plain(pc.dim('No default env. Bare `cce` will open the picker.'));
+    log.plain(pc.dim(t('list.noDefault')));
   }
   return 0;
 }

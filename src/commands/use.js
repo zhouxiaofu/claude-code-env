@@ -2,6 +2,7 @@
 
 const config = require('../config');
 const log = require('../util/log');
+const { t } = require('../i18n');
 
 function run(args) {
   const cfg = config.load();
@@ -9,20 +10,20 @@ function run(args) {
   if (args.length === 0 || args[0] === '--none') {
     config.setDefault(cfg, null);
     config.save(cfg);
-    log.success('Cleared default env. Bare `cce` will not inject env.');
+    log.success(t('use.cleared'));
     return 0;
   }
 
   const name = args[0];
   if (!cfg.envs[name]) {
     const available = config.listEnvNames(cfg).join(', ') || '(none)';
-    log.error(`Env "${name}" does not exist. Available: ${available}`);
+    log.error(t('cli.envNotExist', { name, available }));
     return 1;
   }
 
   config.setDefault(cfg, name);
   config.save(cfg);
-  log.success(`Default env set to "${name}".`);
+  log.success(t('use.set', { name }));
   return 0;
 }
 

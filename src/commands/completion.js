@@ -2,6 +2,7 @@
 
 const config = require('../config');
 const log = require('../util/log');
+const { t } = require('../i18n');
 
 // `cce completion <shell>`     — print a completion script to stdout.
 // `cce completion --envs`      — internal: emit newline-separated env names for completion to consume.
@@ -33,7 +34,7 @@ function run(args) {
       process.stdout.write(fishScript());
       return 0;
     default:
-      log.error('Usage: cce completion <bash|zsh|powershell|fish>');
+      log.error(t('completion.usage'));
       log.plain('');
       log.plain('  bash:        cce completion bash       >> ~/.bashrc        # then: source ~/.bashrc');
       log.plain('  zsh:         cce completion zsh        >> ~/.zshrc         # then: source ~/.zshrc');
@@ -43,8 +44,10 @@ function run(args) {
   }
 }
 
-const SUB = ['list', 'ls', 'show', 'edit', 'use', 'current', 'pick', 'completion', 'help'];
-const TOP_FLAGS = ['-e', '--env', '-a', '-A', '-h', '--help', '-v', '--version'];
+const SUB = ['list', 'ls', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'help'];
+const TOP_FLAGS = ['-e', '--env', '-a', '-A', '-m', '--merge-mode', '-h', '--help', '-v', '--version'];
+const MERGE_MODES = ['override', 'cce', 'claude'];
+const LANGS = ['en', 'zh-CN', 'auto'];
 
 function bashScript() {
   return `# cce bash completion — install with: cce completion bash >> ~/.bashrc
@@ -64,6 +67,14 @@ _cce_completion() {
       ;;
     completion)
       COMPREPLY=( $(compgen -W "bash zsh powershell fish" -- "$cur") )
+      return 0
+      ;;
+    -m|--merge-mode)
+      COMPREPLY=( $(compgen -W "${MERGE_MODES.join(' ')}" -- "$cur") )
+      return 0
+      ;;
+    lang)
+      COMPREPLY=( $(compgen -W "${LANGS.join(' ')}" -- "$cur") )
       return 0
       ;;
   esac
@@ -100,6 +111,14 @@ _cce() {
       compadd -- bash zsh powershell fish
       return
       ;;
+    -m|--merge-mode)
+      compadd -- ${MERGE_MODES.join(' ')}
+      return
+      ;;
+    lang)
+      compadd -- ${LANGS.join(' ')}
+      return
+      ;;
   esac
 
   if (( CURRENT == 2 )); then
@@ -119,7 +138,7 @@ function __cce_envs
 end
 
 # Subcommands (only when no subcommand has been typed yet)
-complete -c cce -n '__fish_use_subcommand' -a 'list ls show edit use current pick completion help'
+complete -c cce -n '__fish_use_subcommand' -a 'list ls show edit use current lang pick completion help'
 complete -c cce -n '__fish_use_subcommand' -s e -l env -a '(__cce_envs)' -d 'Use an env'
 complete -c cce -n '__fish_use_subcommand' -s a -d 'Merge claude args'
 complete -c cce -n '__fish_use_subcommand' -s A -d 'Override claude args'
@@ -131,9 +150,11 @@ for cmd in use show
   complete -c cce -n "__fish_seen_subcommand_from $cmd" -a '(__cce_envs)'
 end
 complete -c cce -n '__fish_seen_subcommand_from completion' -a 'bash zsh powershell fish'
+complete -c cce -n '__fish_seen_subcommand_from lang' -a 'en zh-CN auto'
 
 # -e/--env arg completion at any position before pass-through
 complete -c cce -s e -l env -a '(__cce_envs)' -d 'Use an env'
+complete -c cce -s m -l merge-mode -x -a 'override cce claude' -d 'settings.json env merge mode'
 `;
 }
 
@@ -154,8 +175,8 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
         } catch { @() }
     }
 
-    $subcommands = @('list','ls','show','edit','use','current','pick','completion','help')
-    $flags       = @('-e','--env','-h','--help','-v','--version')
+    $subcommands = @('list','ls','show','edit','use','current','lang','pick','completion','help')
+    $flags       = @('-e','--env','-m','--merge-mode','-h','--help','-v','--version')
 
     # Complete env names after these tokens
     if ($prev -in @('-e','--env','use','show')) {
@@ -166,6 +187,18 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
 
     if ($prev -eq 'completion') {
         @('bash','zsh','powershell','fish') | Where-Object { $_ -like "$wordToComplete*" } |
+            ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+        return
+    }
+
+    if ($prev -in @('-m','--merge-mode')) {
+        @('override','cce','claude') | Where-Object { $_ -like "$wordToComplete*" } |
+            ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+        return
+    }
+
+    if ($prev -eq 'lang') {
+        @('en','zh-CN','auto') | Where-Object { $_ -like "$wordToComplete*" } |
             ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
         return
     }

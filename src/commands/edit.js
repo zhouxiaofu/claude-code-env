@@ -5,6 +5,7 @@ const crossSpawn = require('cross-spawn');
 
 const config = require('../config');
 const log = require('../util/log');
+const { t } = require('../i18n');
 
 function pickEditor() {
   if (process.env.VISUAL) return process.env.VISUAL;
@@ -20,17 +21,17 @@ function run() {
   }
 
   const editor = pickEditor();
-  log.info(`Opening ${file} with ${editor}`);
+  log.info(t('edit.opening', { file, editor }));
 
   const result = crossSpawn.sync(editor, [file], { stdio: 'inherit' });
   if (result.error) {
-    log.error(`Failed to launch editor "${editor}": ${result.error.message}`);
+    log.error(t('edit.launchFailed', { editor, message: result.error.message }));
     return 1;
   }
   // Validate the post-edit JSON.
   try {
     config.load();
-    log.success('Config saved.');
+    log.success(t('edit.saved'));
     return 0;
   } catch (e) {
     log.error(e.message);

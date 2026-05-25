@@ -1,6 +1,6 @@
 {
   "name": "@xiaofuzhou/cce",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Per-process Claude Code env launcher with default args management (global + per-env), interactive picker, shell completion, and env-leak protection. One command to inject provider env (DeepSeek/Kimi/GLM/CCR/...) and start claude.",
   "bin": {
     "cce": "bin/cce.js"
@@ -10,6 +10,7 @@
     "src",
     "schema.json",
     "README.md",
+    "docs",
     "LICENSE"
   ],
   "engines": {
@@ -17,7 +18,7 @@
   },
   "type": "commonjs",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test",
     "start": "node bin/cce.js"
   },
   "dependencies": {

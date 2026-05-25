@@ -1,5 +1,11 @@
 # Claude Code Env Launcher (`cce`) —— 设计文档
 
+<div align="center">
+
+**简体中文** | [English](./DESIGN.en.md)
+
+</div>
+
 > 一行命令注入 env + 启动 Claude Code，跨平台、npm 可装、零侵入。
 >
 > 目标用法：`cce -e deepseek -a "--permission-mode bypassPermissions"`（claude 参数包在 `-a` 字符串里；常用值放进 config 后裸 `cce -e deepseek` 也会自动注入）
@@ -27,14 +33,13 @@
 
 ---
 
-## 2. 现状与本方案的差异
+## 2. 与其他方案的差异
 
 | 方案 | 切换粒度 | 一行命令 | 跨平台 | npm 装 |
 |---|---|---|---|---|
 | `~/.claude/settings.json` 多副本手动 copy | 全局 | ❌ | ✅ | — |
 | `cc-switch` (GUI) | 全局 | ❌ | ✅ | — |
 | `claude-code-router` | 全局代理 | ❌（要先起 router） | ✅ | ✅ |
-| PowerShell Profile 函数（你现在的方案） | 每窗口 | ✅ | ❌（仅 PS） | ❌ |
 | **本工具 `cce`** | **每进程** | **✅** | **✅** | **✅** |
 
 核心区别：`cce` 不修改任何全局状态，env 只活在 `claude` 子进程的生命周期里。
@@ -524,7 +529,7 @@ v0.1 的方案与 `~/.claude/settings.json` 一致：**明文 JSON**。这是当
 ### M2.5 —— 交互式管理（v0.2 候选）
 - [ ] `cce add`（厂商模板向导：DeepSeek/Kimi/GLM/CCR/Custom）
 - [ ] `cce remove <name>`（带确认）
-- [ ] `cce import` 从 cc-switch / 现有 `providers.json` 导入
+- [ ] `cce import` 从 cc-switch 导入
 
 ### M3 —— 发布
 - [ ] README（中英双语，含 GIF demo）
@@ -620,21 +625,69 @@ v0.1 的方案与 `~/.claude/settings.json` 一致：**明文 JSON**。这是当
 
 ---
 
-## 12. 附：与现有方案的关系
+## 12. 附：与其他工具的叠加关系
 
-```
-你的 PowerShell Profile 函数（现状）
-        │
-        │  优点：零依赖、原生 per-window
-        │  缺点：仅 PowerShell、密钥散落、不易分享
-        ▼
-   本工具 cce（升级版）
-        │
-        │  优点：跨平台、npm 装、单一配置、对外可分享
-        │  与 PS 函数等价：每个 cce 调用 = 一个独立子进程
-        ▼
-   可叠加：claude-code-router 当作 env 之一
-   可叠加：本地 proxy.js 当作 env 之一
+cce 只是启动器，与生态里的其他工具不互斥，反而能叠加：
+
+- **claude-code-router (CCR)**：把 CCR 配成一个 env（`ANTHROPIC_BASE_URL=http://127.0.0.1:3456`），需要多模型路由时 `cce -e ccr`，不需要时直连其他 provider。
+- **本地 proxy**：同理，把自建代理配成一个 env 即可。
+- **cc-switch (GUI)**：改 `~/.claude/settings.json` 当全局默认；cce 在子进程级用 `--settings` 临时文件覆盖（见 §13.1），两者可共存。
+
+核心区别仍是：cce 不修改任何全局状态，env 只活在 `claude` 子进程的生命周期里。
+
+---
+
+## 13. v0.2 迭代：settings.json env 合并 + 多语言
+
+### 13.1 settings.json env 合并（解决「反向覆盖」）
+
+**问题**：cce 把 provider env 注入到 `claude` 子进程，但 Claude Code 自己也会读 `~/.claude/settings.json` 的 `env`，且其优先级可能高于进程 env，导致 cce 的注入被反向盖掉、切换失效。
+
+**方案**：cce **绝不改写**真实 `~/.claude/settings.json`。而是读它的 `env`，按模式重组出一份只含 `env` 的对象，写到 `~/.claude/cce/tmp/settings-<pid>-<rand>.json`，再用 `claude --settings <tmpfile>` 启动；claude 退出即删该临时文件。
+
+- `claude --help` 实证：`--settings <file-or-json>` 加载 **additional** settings，处于「命令行参数」优先级，**高于** user `~/.claude/settings.json`（最低层）。所以临时文件的 `env` 会盖过 user 的同名键。
+- `--settings` 是**合并叠加**而非整体替换，对每个键以高优先级层为准、低层独有键会合并上来。因此对每个键 `effective[k] = (k in tempEnv) ? tempEnv[k] : userEnv[k]`。
+- 「删不掉 user 独有键」的限制，用**写空串屏蔽**绕过（已实测：settings 里空串 env 会被 claude 当作未设置）。
+
+**三种模式**（`tempEnv` = 写进临时文件的 env）：
+
+| 模式 | CLI 值 | `tempEnv` 内容 | 效果 |
+|---|---|---|---|
+| `override`（默认） | `override` | `entry.env` + 把 user 里 entry 未定义的 `KNOWN_ANTHROPIC_VARS` 设为 `""` | 完全以本 env 为准，残留 anthropic 键被屏蔽；user 的非 anthropic 键保留 |
+| `merge-cce` | `cce` | `entry.env` | 与 user 取并集，冲突时本 env 优先 |
+| `merge-claude` | `claude` | `entry.env` 去掉 user 已有的键 | 与 user 取并集，冲突时 user 的 settings.json 优先 |
+
+**为什么改成单通道**：`buildChildEnv` 不再把 anthropic 变量注入进程 env，改为只**剥离** `KNOWN_ANTHROPIC_VARS`（防 shell 残留），provider env 全部走临时 settings 文件。原因：进程 env vs settings env 的优先级官方未文档化，而 `--settings` 的优先级是确定的；双通道在 `merge-claude` 模式下还会自相矛盾。单通道 = 单一、可预测的优先级。
+
+**分层 + 优先级**（与 args 同构）：根级 `settingsMode` → per-env `settingsMode` → CLI `-m/--merge-mode`，高者覆盖低者，默认 `override`。
+
+**安全**：临时文件名带 `pid`+随机，并发多窗口互不干扰；`chmod 600`；正常退出 / 报错 / 信号 / `process.on('exit')` 全路径清理；启动时清扫 6h 以上的孤儿文件（崩溃残留）。临时文件含展开后的明文 token，但生命周期极短、不进真实配置，比持久化写 settings.json 安全得多。
+
+> 与 §1.1「不修改 settings.json、零全局副作用」一致：临时文件只活在子进程生命周期里，真实 settings.json 一字不动。
+
+### 13.2 多语言（i18n）
+
+- **检测优先级**：`CCE_LANG` 环境变量 > config `lang` > 系统 locale（`Intl` / `LANG`）> 兜底 `en`。
+- **不引入 `--lang` flag**：cce 刻意保持封闭、最小的 flag 空间（§4.1），除通用的 `-h/-v` 外不加「非启动」flag。语言这种「只改 cce 自己输出、不影响启动什么」的设置走主流分工：
+  - 本次/会话级覆盖 → `CCE_LANG` 环境变量（locale 的主流做法，对齐 `LANG`/`LC_ALL`）。
+  - 持久偏好 → `cce lang` 子命令（对齐 `git config` / `gh config set`）：`cce lang` 看当前来源，`cce lang en|zh-CN` 写 config，`cce lang auto` 清回自动检测。
+- **实现**：`src/i18n/{index,en,zh-CN}.js`，零依赖；`t(key, params)` 查当前语言→回退 en→回退 key 名；`{name}` 插值。英文为 source of truth，测试强制两份 catalog 键集合一致。
+- **范围**：help（整段双语）、warn / error / picker / 各命令提示。启动摘要行（`env=… model=… settings=…`）是数据，不翻译。
+- `lang` 在加载完整 config（及其本地化报错）之前就要确定，故用 `config.peekLang()` 做一次不抛异常的轻量读取。
+
+### 13.3 新增 / 变更字段
+
+```jsonc
+{
+  "lang": null,                 // "en" | "zh-CN" | null(自动)
+  "settingsMode": "override",   // 全局默认：override | merge-cce | merge-claude
+  "envs": {
+    "deepseek": {
+      "settingsMode": "merge-cce",   // per-env 覆盖（可选，省略则继承全局）
+      "env": { /* ... */ }
+    }
+  }
+}
 ```
 
-迁移路径：把你 `providers.json` 的内容直接复制到 `~/.claude/cce/config.json` 的 `envs` 字段下即可，零成本。
+新增 CLI：`-m/--merge-mode <override|cce|claude>`（启动修饰符）、`cce lang [en|zh-CN|auto]`（子命令）。新增 env 读取点尊重 `CLAUDE_CONFIG_DIR`（与 claude 一致）。

@@ -1,332 +1,151 @@
-# cce — Claude Code Env Launcher
+# cce — Claude Code 多 Provider 启动器
+
+<div align="center">
+
+**简体中文** | [English](./README.en.md)
+
+</div>
 
 [![npm version](https://img.shields.io/npm/v/@xiaofuzhou/cce.svg)](https://www.npmjs.com/package/@xiaofuzhou/cce)
 [![license](https://img.shields.io/npm/l/@xiaofuzhou/cce.svg)](LICENSE)
+[![node](https://img.shields.io/node/v/@xiaofuzhou/cce.svg)](https://nodejs.org)
 
-> Per-process environment launcher for [Claude Code](https://docs.claude.com/en/docs/claude-code). One command to inject any provider's env (DeepSeek / Kimi / GLM / claude-code-router / official Anthropic / your own proxy) and start `claude`, with default CLI args managed in config.
+> 一行命令，用**任意 provider** 启动 [Claude Code](https://docs.claude.com/en/docs/claude-code)
+> —— DeepSeek、Kimi、GLM、官方 Anthropic、[claude-code-router](https://github.com/musistudio/claude-code-router)
+> 或你自己的代理。每次启动都是独立子进程，因此每个终端窗口都能**并行**跑不同的
+> provider，全程不碰任何全局状态。
 
 ```bash
-cce -e deepseek                                      # launch claude with deepseek env
-cce -e deepseek -a "--permission-mode bypassPermissions"   # plus extra claude args
-cce pick                                             # interactive menu, then launch
+cce -e deepseek          # 用 deepseek env 启动 claude
+cce pick                 # 交互式菜单，选完即启动
+cce -e kimi -m cce       # 与 ~/.claude/settings.json 合并，kimi 优先
 ```
 
 ---
 
-## Why?
+## 为什么用它？
 
-If you switch Claude Code between multiple providers (DeepSeek, Kimi, GLM, official Anthropic, [CCR](https://github.com/musistudio/claude-code-router), local proxies), today you usually copy `~/.claude/settings.json` by hand or restart a global router. Neither lets each terminal window use a different provider in parallel.
+在多个 provider 间切换 Claude Code，通常得手改 `~/.claude/settings.json` 或重启全局路由
+—— 而且没法让两个窗口同时用两个 provider。`cce` 只把环境变量注入到 **`claude` 子进程**，
+因此每个窗口互相独立，你的 shell 始终保持干净。
 
-`cce` injects env vars **only into the `claude` child process**, so every terminal/window can launch its own provider independently. Nothing in your shell or system is touched.
-
-| Approach | Per-window? | One command? | Cross-platform? | npm-installable? |
+| 方案 | 每窗口独立？ | 一行命令？ | 跨平台？ | npm 可装？ |
 |---|---|---|---|---|
-| Copy `~/.claude/settings.json` by hand | global | ❌ | ✅ | — |
-| [`cc-switch`](https://github.com/farion1231/cc-switch) (GUI) | global | ❌ | ✅ | — |
-| [`claude-code-router`](https://github.com/musistudio/claude-code-router) | global (proxy) | ❌ | ✅ | ✅ |
-| PowerShell profile functions | per-window | ✅ | ❌ (PS only) | ❌ |
-| **`cce`** | **per-process** | **✅** | **✅** | **✅** |
+| 手动 copy `~/.claude/settings.json` | 全局 | ❌ | ✅ | — |
+| [`cc-switch`](https://github.com/farion1231/cc-switch)（GUI） | 全局 | ❌ | ✅ | — |
+| [`claude-code-router`](https://github.com/musistudio/claude-code-router) | 全局（代理） | ❌ | ✅ | ✅ |
+| **`cce`** | **每进程** | **✅** | **✅** | **✅** |
+
+## 功能特性
+
+- 🚀 **一行命令** —— 注入某个 provider 的 env 并启动 `claude`，一步到位。
+- 🪟 **每进程独立** —— 不同窗口可同时跑不同 provider；你的 shell 和系统环境一字不动。
+- ⚙️ **默认参数管理** —— 常用 claude 参数（如 `--permission-mode bypassPermissions`）存进配置，全局或 per-env；`-a` 追加、`-A` 覆盖。
+- 🔀 **settings.json 合并** —— 三种模式（`override` / `cce` / `claude`）决定 env 如何与 `~/.claude/settings.json` 合并。cce **从不改写**该文件，而是生成临时文件用 `claude --settings` 启动。
+- 🎛️ **交互式选择器** —— `cce pick` 弹出方向键菜单。
+- 🌐 **多语言界面** —— 中文 / 英文，自动检测，`cce lang` 可切换。
+- 🐚 **Shell 补全** —— bash、zsh、fish、PowerShell，连你自己的 env 名都能补全。
+- 📦 **零配置安装** —— `npm i -g`，凡是有 Node 18+ 的地方都能跑。
 
 ---
 
-## Install
+## 安装
 
 ```bash
 npm install -g @xiaofuzhou/cce
 ```
 
-### Requirements
+**要求：** Node.js ≥ 18，且 `claude` 在 PATH 中可用（或用 `CCE_CLAUDE_BIN` 指定其完整路径）。
 
-- **Node.js ≥ 18**
-- **Claude Code** installed and available as `claude` on PATH (or set `CCE_CLAUDE_BIN` to its full path)
-
-### Supported platforms
-
-| OS | Shell | Status |
+| 系统 | Shell | 状态 |
 |---|---|---|
-| Windows 11 | PowerShell 7+, cmd | ✅ tested |
-| macOS | zsh, bash, fish | ✅ |
-| Linux | bash, zsh, fish | ✅ |
+| Windows 11 | PowerShell 7+、cmd | ✅ 已测试 |
+| macOS | zsh、bash、fish | ✅ |
+| Linux | bash、zsh、fish | ✅ |
 
 ---
 
-## Quickstart
+## 快速开始
 
 ```bash
-# 1. Edit config to add your envs (cce writes a starter file the first time)
+# 1. 打开配置添加你的 env（首次运行 cce 会写入一份起始文件）
 cce edit
 
-# 2. List what you've got
+# 2. 看看都有哪些 env（* 标记默认项）
 cce list
 
-# 3. Set a default (so bare `cce` uses it)
+# 3. 设一个默认，裸 `cce` 就会用它
 cce use deepseek
 
-# 4. Launch claude with the default env
+# 4. 用默认 env 启动 claude
 cce
 
-# 5. Or pick interactively
+# 5. ……或交互式选择
 cce pick
 
-# 6. Pass extra claude flags (merged with config defaults)
+# 6. 传入额外的 claude 参数（与配置默认合并）
 cce -e kimi -a "--permission-mode bypassPermissions"
-cce -e kimi -a "-c"            # claude's own -c (continue) wrapped in -a
 ```
 
-> ⚠ **All claude CLI flags go inside `-a "..."` or `-A "..."`.** cce does **not** pass unknown flags through directly — this guarantees no collisions with future claude flags.
-
----
-
-## Commands
-
-```
-cce [options]                       launch claude with default or selected env
-cce <subcommand> [args...]          manage envs
-
-LAUNCH OPTIONS
-  -e, --env <name>                  use a specific env for this launch
-  -a "<args>"                       merge claude args with config defaults (repeatable)
-  -A "<args>"                       override config defaults, use only these args
-                                    (bare -A at end = launch claude with no args)
-  -h, --help                        show help
-  -v, --version                     show version
-
-SUBCOMMANDS
-  list, ls                          list all envs (* marks the default)
-  show <name>                       show an env's variables + merged claude args
-  edit                              open config.json in $EDITOR (add/remove envs by hand)
-  use <name>                        set the default env (or --none to clear)
-  current                           print the default env name
-  pick [-a/-A ...]                  interactively pick an env, then launch claude
-  completion <shell>                output shell completion script (bash|zsh|powershell|fish)
-  help                              show this help
-```
-
----
-
-## Configuration
-
-`cce` stores everything in **`~/.claude/cce/config.json`** (Windows: `%USERPROFILE%\.claude\cce\config.json`). Override the location with `CCE_CONFIG_HOME`.
-
-### Schema
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `version` | integer | yes | Config schema version (currently `1`) |
-| `default` | string \| null | no | Env name used when `cce` is invoked with no `-e`. If null/missing, bare `cce` opens the interactive picker (TTY) or launches without env injection (non-TTY). |
-| `args` | string | no | **Global** default claude CLI args (shell-tokenized). Prepended to every launch. Example: `"--permission-mode bypassPermissions"` |
-| `envs.<name>` | object | yes | A named env. The key (`<name>`) is what you pass to `-e`. Must match `[A-Za-z0-9][A-Za-z0-9._-]*`. |
-| `envs.<name>.description` | string | no | Human-readable description shown in `cce list` and `cce show`. |
-| `envs.<name>.env` | object | yes | Environment variables to inject into the `claude` child process. **Field name matches Claude Code's own `~/.claude/settings.json` `env` block, so you can copy-paste blocks directly.** Values may contain `${VAR}` placeholders, resolved from the parent shell env at launch time. |
-| `envs.<name>.args` | string | no | Per-env claude args (shell-tokenized). By default merged onto the global `args`; set `argsOverride: true` to replace global instead. |
-| `envs.<name>.argsOverride` | boolean | no | Default `false`. If `true`, this env's `args` **replace** the global `args` (instead of merging). The CLI's `-a` flag is still appended on top. |
-
-### Annotated example
+一份最小的 `~/.claude/cce/config.json`：
 
 ```jsonc
 {
   "version": 1,
-  "default": "claude",                                 // bare `cce` uses this env
-
-  // Global default claude args — applied to every launch.
-  // To skip them for one launch, use `-A "..."` on the command line.
+  "default": "deepseek",
   "args": "--permission-mode bypassPermissions",
-
   "envs": {
-    "claude": {
-      "description": "Claude official subscription (via local proxy)",
-      // Empty `env: {}` means: don't override ANTHROPIC_* — let claude use
-      // its own ~/.claude credentials (Pro/Max subscription auth).
-      // We still set HTTP_PROXY here so claude routes through a local proxy.
-      "env": {
-        "HTTP_PROXY": "http://127.0.0.1:10808",
-        "HTTPS_PROXY": "http://127.0.0.1:10808",
-        "NO_PROXY": "localhost,127.0.0.1"
-      }
-    },
-
     "deepseek": {
-      "description": "DeepSeek V4 Pro (Anthropic-compatible endpoint)",
-      // Per-env args: merged on top of global → effective args =
-      // "--permission-mode bypassPermissions --add-dir D:\\code"
-      "args": "--add-dir D:\\code",
+      "description": "DeepSeek（Anthropic 兼容端点）",
       "env": {
-        "ANTHROPIC_BASE_URL":            "https://api.deepseek.com/anthropic",
-        "ANTHROPIC_AUTH_TOKEN":          "sk-xxxxxxxxxxxx",
-        "ANTHROPIC_MODEL":               "deepseek-v4-pro",
-        "ANTHROPIC_DEFAULT_OPUS_MODEL":  "deepseek-v4-pro",
-        "ANTHROPIC_DEFAULT_SONNET_MODEL":"deepseek-v4-pro",
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash",
-        "CLAUDE_CODE_SUBAGENT_MODEL":    "deepseek-v4-flash",
-        "CLAUDE_CODE_EFFORT_LEVEL":      "max"
+        "ANTHROPIC_BASE_URL":   "https://api.deepseek.com/anthropic",
+        "ANTHROPIC_AUTH_TOKEN": "sk-xxxxxxxxxxxx",
+        "ANTHROPIC_MODEL":      "deepseek-chat"
       }
     },
-
     "kimi": {
       "description": "Moonshot Kimi K2",
       "env": {
         "ANTHROPIC_BASE_URL":   "https://api.moonshot.cn/anthropic",
-        // ${VAR} is resolved from your shell env at launch time —
-        // keep secrets out of this file by exporting KIMI_KEY in your rc.
         "ANTHROPIC_AUTH_TOKEN": "${KIMI_KEY}",
         "ANTHROPIC_MODEL":      "kimi-k2-0905-preview"
       }
-    },
-
-    "ccr": {
-      "description": "Local claude-code-router",
-      "env": {
-        "ANTHROPIC_BASE_URL":   "http://127.0.0.1:3456",
-        "ANTHROPIC_AUTH_TOKEN": "any"
-      }
-    },
-
-    "raw": {
-      "description": "Verbose-only run, ignore global args",
-      "args": "--verbose",
-      "argsOverride": true,           // ← global `args` are dropped for this env
-      "env": {}
     }
   }
 }
 ```
 
-### Default args — merge semantics
-
-`cce` does **pure concatenation** when combining args layers:
-
-```
-final = (envEntry.argsOverride ? "" : globalArgs) + " " + envEntry.args + " " + all -a "..."
-```
-
-Then shell-tokenized into argv and passed to `claude`. cce does **not** dedupe — claude itself handles repeated flags (most are last-wins; repeatable flags like `--add-dir` stack).
-
-| Command | What spawns |
-|---|---|
-| `cce -e deepseek` | `claude --permission-mode bypassPermissions --add-dir D:\code` |
-| `cce -e deepseek -a "--resume X"` | `claude --permission-mode bypassPermissions --add-dir D:\code --resume X` |
-| `cce -e deepseek -A "--resume X"` | `claude --resume X` (all defaults dropped) |
-| `cce -e deepseek -A` | `claude` (no args at all) |
-| `cce -e raw` | `claude --verbose` (env's `argsOverride: true` drops global) |
-| `cce -e foo -a "X" -A "Y"` | **Error**: `-a and -A are mutually exclusive` |
-
-Tokenizer rule (Windows-friendly): **backslashes are always literal**, only quotes group tokens. So `--add-dir D:\code` works as expected; for paths with spaces, quote them: `--add-dir 'D:\My Code'`.
-
-### Env-leak protection
-
-Before spawning `claude`, `cce` strips these vars from the inherited env so a leaked `export ANTHROPIC_BASE_URL=...` in your shell can never silently override:
-
-```
-ANTHROPIC_BASE_URL, ANTHROPIC_AUTH_TOKEN, ANTHROPIC_API_KEY,
-ANTHROPIC_MODEL, ANTHROPIC_SMALL_FAST_MODEL,
-ANTHROPIC_DEFAULT_HAIKU_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL, ANTHROPIC_DEFAULT_OPUS_MODEL
-```
-
-To keep one explicitly, reference it from the env entry: `"ANTHROPIC_BASE_URL": "${ANTHROPIC_BASE_URL}"`.
+> ⚠ **记住一条规则：** 所有 claude 的 CLI flag 都要包在 `-a "..."`（合并）或
+> `-A "..."`（覆盖）里。`cce` **不会**直接透传未知 flag —— 这保证它永远不会与
+> claude 未来新增的 flag 冲突。
 
 ---
 
-## Interactive picker
+## 📖 完整文档
 
-`cce pick` opens a keyboard menu, then launches claude with the chosen env:
+上面的快速开始覆盖了常见用法。其余内容 —— 完整的配置 schema、参数合并语义、三种
+`settings.json` 合并模式、语言系统、交互式选择器、Shell 补全与排错 —— 详见
+**[完整使用指南](docs/usage.md)**。
 
-```
-Pick an env to launch claude:
-
-❯ * claude     Claude official subscription (via local proxy)
-    deepseek   DeepSeek V4 Pro
-    kimi       Moonshot Kimi K2
-    ccr        Local claude-code-router
-
-  ↑/↓ navigate · Enter select · Esc/Ctrl+C cancel
-```
-
-- `*` marks the current default (cursor starts on it — Enter is the obvious choice)
-- `↑/↓` or `k/j` to move, number keys `1`–`9` jump, `Enter` selects, `Esc`/`Ctrl+C`/`q` cancels
-- Picking does **not** change your default — use `cce use <name>` for that
-- Bare `cce` also opens the picker if you have envs configured but no default set
-- `-a` / `-A` work too: `cce pick -a "--verbose"`
+- **[使用指南](docs/usage.md)** —— 完整参考与示例
+- **[设计文档](docs/DESIGN.md)** —— 架构与决策记录
 
 ---
 
-## Shell completion
+## 与 cc-switch / claude-code-router 的关系
 
-`cce completion <shell>` prints a completion script to stdout. Install once:
-
-| Shell | Install |
-|---|---|
-| **bash** | `cce completion bash >> ~/.bashrc` then `source ~/.bashrc` |
-| **zsh** | `cce completion zsh >> ~/.zshrc` then `source ~/.zshrc` |
-| **fish** | `cce completion fish > ~/.config/fish/completions/cce.fish` |
-| **PowerShell** | `cce completion powershell >> $PROFILE` then `. $PROFILE` |
-
-You get Tab completion for subcommands, flags, and — most usefully — your own env names after `-e` / `--env` / `use` / `show`.
-
-```bash
-cce -e <Tab>       # → claude  deepseek  kimi  ccr
-cce use <Tab>      # → claude  deepseek  kimi  ccr
-```
+- **cc-switch** —— GUI 全局切换工具，与本工具不冲突。`cc-switch` 改 `~/.claude/settings.json` 当全局默认，`cce` 在子进程级覆盖，两者可共存。
+- **claude-code-router (CCR)** —— 把 CCR 配成 `cce` 的一个 env 即可（`ANTHROPIC_BASE_URL=http://127.0.0.1:3456`），需要时 `cce -e ccr` 走路由，不需要时直连其他 provider。
 
 ---
 
-## Environment variables
+## 链接
 
-| Variable | Purpose |
-|---|---|
-| `CCE_CONFIG_HOME` | Override config directory (default `~/.claude/cce/`) |
-| `CCE_CLAUDE_BIN` | Full path to the `claude` executable (skip PATH lookup) |
-| `CCE_QUIET=1` | Suppress the `[cce]` startup lines |
-| `CCE_DEBUG=1` | Print stack traces on internal errors |
+- **npm**：https://www.npmjs.com/package/@xiaofuzhou/cce
+- **GitHub**：https://github.com/zhouxiaofu/claude-code-env
+- **Issues**：https://github.com/zhouxiaofu/claude-code-env/issues
+- **Claude Code 文档**：https://docs.claude.com/en/docs/claude-code
 
----
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `Could not find the claude executable` | Install Claude Code, ensure `claude` is on PATH, or set `CCE_CLAUDE_BIN=/full/path/to/claude` |
-| `Env "X" does not exist` | `cce list` to see what's defined; `cce edit` to add one |
-| `Unknown option: --foo` | All claude args go inside `-a "..."` (merge) or `-A "..."` (override). cce does not pass unknown flags through directly. |
-| `-a and -A are mutually exclusive` | Pick one: `-a` to add to defaults, `-A` to replace them. |
-| `default env "X" does not exist in config` | `cce use <name>` to switch, or `cce edit` to fix the config. Bare `cce` will fall back to the picker. |
-| Config file got corrupted | Look for `config.json.bak.<timestamp>` next to it — `cce` saves a backup before failing |
-| Switched env but still hitting old endpoint | Check `${VAR}` placeholders resolve in your shell env; verify with `cce show <name>` |
-
----
-
-## 中文简介
-
-`cce` 是 Claude Code 的多 provider 启动器。
-
-- **一行命令**：`cce -e deepseek` 同时完成 env 注入 + 启动 claude
-- **每进程独立**：每个窗口/每次调用都是独立的子进程，env 互不污染，可以同时跑多个不同 provider
-- **默认参数管理**：常用的 claude 参数（如 `--permission-mode bypassPermissions`）存进 config 的 `args` 字段，全局或 per-env，启动时自动注入。`-a` 追加、`-A` 覆盖
-- **交互式选择**：`cce pick` 弹方向键菜单选 env，选完直接起 claude
-- **跨平台**：Windows / macOS / Linux 通过 `npm i -g @xiaofuzhou/cce` 一键安装
-- **Shell 补全**：bash / zsh / fish / PowerShell 都支持
-
-### 重要规则
-
-cce **不再隐式透传** claude 参数。所有 claude 的 CLI flag（`-c`、`--permission-mode`、`--add-dir` 等）必须包在 `-a "..."` 或 `-A "..."` 字符串里传给 cce。这一变化让 cce 永远不会跟 claude 未来新增的 flag 冲突。
-
-### 配置 env
-
-term：一个 **env** 是一组命名的环境变量（`env` 字段名与 claude `settings.json` 的 `env` 块一致，可直接复制粘贴）。配置文件位于 `~/.claude/cce/config.json`，详见上文 [Configuration](#configuration) 章节。
-
-### 与 cc-switch / claude-code-router 的关系
-
-- **cc-switch**：GUI 全局切换工具，与本工具不冲突。`cc-switch` 改 `~/.claude/settings.json` 当作全局默认，`cce` 在子进程级别覆盖，两者可以共存
-- **claude-code-router (CCR)**：把 CCR 配成 `cce` 的一个 env 即可（`ANTHROPIC_BASE_URL=http://127.0.0.1:3456`），需要时 `cce -e ccr` 走路由，不需要时直连其他 provider
-
----
-
-## Links
-
-- **npm**: https://www.npmjs.com/package/@xiaofuzhou/cce
-- **GitHub**: https://github.com/zhouxiaofu/claude-code-env
-- **Issues**: https://github.com/zhouxiaofu/claude-code-env/issues
-- **Claude Code docs**: https://docs.claude.com/en/docs/claude-code
-
-## License
+## 许可证
 
 [MIT](LICENSE)
