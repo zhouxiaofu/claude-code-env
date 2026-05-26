@@ -96,6 +96,22 @@ module.exports = {
   // completion
   'completion.usage': '用法：cce completion <bash|zsh|powershell|fish>',
 
+  // update
+  'update.checking': '正在检查更新…',
+  'update.checkFailed': '无法连接 npm registry。请检查网络后重试。',
+  'update.upToDate': 'cce 已是最新版本（v{version}）。',
+  'update.available': '有新版本可用：{current} → {latest}',
+  'update.runToInstall': '运行 `cce update` 即可安装。',
+  'update.installing': '正在通过 npm 安装 {latest}…',
+  'update.installed': '已更新到 v{version}。重新运行 cce 即可使用新版本。',
+  'update.installFailed': 'npm 安装失败。可手动执行：npm i -g {spec}',
+  'update.gitCheckout': '检测到这是 git 源码目录 —— 请用 `git pull` 更新，而非 npm。',
+  'update.promptTitle': 'cce v{latest} 可用（当前 v{current}）。现在更新吗？',
+  'update.choiceUpdate': '立即更新',
+  'update.choiceSkip': '跳过此版本',
+  'update.skipped': '已跳过 v{version} —— 出现更新的版本时会再次提示。',
+  'update.autoDone': 'cce 已在后台更新到 v{version}。',
+
   // config
   'config.readFailed': '读取配置失败 {file}：{message}',
   'config.invalidJson':

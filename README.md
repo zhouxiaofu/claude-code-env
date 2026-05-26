@@ -1,4 +1,4 @@
-# cce — Claude Code 多 Provider 启动器
+# cce — Claude Code 多服务商启动器
 
 <div align="center">
 
@@ -10,42 +10,46 @@
 [![license](https://img.shields.io/npm/l/@xiaofuzhou/cce.svg)](LICENSE)
 [![node](https://img.shields.io/node/v/@xiaofuzhou/cce.svg)](https://nodejs.org)
 
-> 一行命令，用**任意 provider** 启动 [Claude Code](https://docs.claude.com/en/docs/claude-code)
-> —— DeepSeek、Kimi、GLM、官方 Anthropic、[claude-code-router](https://github.com/musistudio/claude-code-router)
-> 或你自己的代理。每次启动都是独立子进程，因此每个终端窗口都能**并行**跑不同的
-> provider，全程不碰任何全局状态。
+> 一行命令，用**任意服务商**启动 [Claude Code](https://docs.claude.com/en/docs/claude-code)
+> —— DeepSeek、Kimi（月之暗面）、智谱 GLM、Anthropic 官方、[claude-code-router](https://github.com/musistudio/claude-code-router)
+> 或你自建的代理。
+>
+> （**服务商**＝提供 Claude 模型或兼容接口的一方，如 DeepSeek、Kimi 等，各有自己的接口地址和密钥。你在 cce 里把「怎么启动一次 claude」存成一套带名字的**启动配置**，本文叫它 **env**——它记录用哪个服务商、哪个模型、默认带什么参数。**同一个服务商也能配好几套 env**，启动时用名字点名其中一套。）
+>
+> 每次启动都是一个独立的子进程，所以每个终端窗口可以**同时**用不同服务商，全程不改动任何全局设置。
 
 ```bash
-cce -e deepseek          # 用 deepseek env 启动 claude
-cce pick                 # 交互式菜单，选完即启动
-cce -e kimi -m cce       # 与 ~/.claude/settings.json 合并，kimi 优先
+cce -e deepseek          # 用名为 deepseek 的配置启动 claude
+cce pick                 # 弹出菜单，选完即启动
+cce -e kimi -m cce       # 与 ~/.claude/settings.json 合并，冲突时 kimi 优先
 ```
 
 ---
 
 ## 为什么用它？
 
-在多个 provider 间切换 Claude Code，通常得手改 `~/.claude/settings.json` 或重启全局路由
-—— 而且没法让两个窗口同时用两个 provider。`cce` 只把环境变量注入到 **`claude` 子进程**，
-因此每个窗口互相独立，你的 shell 始终保持干净。
+想在多个服务商之间切换 Claude Code，通常得手动改 `~/.claude/settings.json`（Claude Code 自己的配置文件），
+或者重启一个全局代理 —— 而且没法让两个窗口同时用两个服务商。`cce` 只把对应的环境变量注入到它
+**新拉起的 `claude` 子进程**里，所以每个窗口互相独立，你自己命令行环境的变量始终保持干净。
 
-| 方案 | 每窗口独立？ | 一行命令？ | 跨平台？ | npm 可装？ |
+| 方案 | 每个窗口能独立切换？ | 一行命令搞定？ | 跨平台？ | 能用 npm 安装？ |
 |---|---|---|---|---|
-| 手动 copy `~/.claude/settings.json` | 全局 | ❌ | ✅ | — |
-| [`cc-switch`](https://github.com/farion1231/cc-switch)（GUI） | 全局 | ❌ | ✅ | — |
-| [`claude-code-router`](https://github.com/musistudio/claude-code-router) | 全局（代理） | ❌ | ✅ | ✅ |
-| **`cce`** | **每进程** | **✅** | **✅** | **✅** |
+| 手动复制改写 `~/.claude/settings.json` | 否（全局共享一份） | ❌ | ✅ | — |
+| [`cc-switch`](https://github.com/farion1231/cc-switch)（图形界面） | 否（全局共享一份） | ❌ | ✅ | — |
+| [`claude-code-router`](https://github.com/musistudio/claude-code-router) | 否（全局代理） | ❌ | ✅ | ✅ |
+| **`cce`** | **是（每个进程一份）** | **✅** | **✅** | **✅** |
 
 ## 功能特性
 
-- 🚀 **一行命令** —— 注入某个 provider 的 env 并启动 `claude`，一步到位。
-- 🪟 **每进程独立** —— 不同窗口可同时跑不同 provider；你的 shell 和系统环境一字不动。
-- ⚙️ **默认参数管理** —— 常用 claude 参数（如 `--permission-mode bypassPermissions`）存进配置，全局或 per-env；`-a` 追加、`-A` 覆盖。
-- 🔀 **settings.json 合并** —— 三种模式（`override` / `cce` / `claude`）决定 env 如何与 `~/.claude/settings.json` 合并。cce **从不改写**该文件，而是生成临时文件用 `claude --settings` 启动。
-- 🎛️ **交互式选择器** —— `cce pick` 弹出方向键菜单。
-- 🌐 **多语言界面** —— 中文 / 英文，自动检测，`cce lang` 可切换。
-- 🐚 **Shell 补全** —— bash、zsh、fish、PowerShell，连你自己的 env 名都能补全。
-- 📦 **零配置安装** —— `npm i -g`，凡是有 Node 18+ 的地方都能跑。
+- 🚀 **一行命令** —— 用某套 env（启动配置）拉起 `claude`，一步到位。
+- 🪟 **每个进程独立** —— 不同窗口可同时用不同 env（不同服务商，或同一服务商的不同配置）；你命令行环境里的变量一字不动。
+- ⚙️ **默认参数管理** —— 常用的 claude 启动参数（如 `--permission-mode bypassPermissions`）存进配置，可全局、也可按某个 env 单独设；`-a` 在此基础上追加、`-A` 整组覆盖。
+- 🔀 **与 settings.json 合并** —— 三种模式（`override` / `cce` / `claude`）决定你的配置如何与 Claude Code 自己的 `~/.claude/settings.json` 合并。cce **从不改写**那个文件，而是另写一份临时文件、用 `claude --settings` 启动。
+- 🔄 **自我更新** —— `cce update` 手动升级到 npm 最新版；启动时也能后台自动更新或提示（见[更新 cce](docs/usage.md#更新-cce)）。
+- 🎛️ **交互式菜单** —— `cce pick` 弹出方向键选择菜单。
+- 🌐 **中英双语界面** —— 自动检测系统语言，`cce lang` 可手动切换。
+- 🐚 **命令行补全** —— bash、zsh、fish、PowerShell，连你自己起的 env 名字都能按 Tab 补全。
+- 📦 **零配置安装** —— `npm i -g` 即可，凡是装了 Node 18+ 的地方都能跑。
 
 ---
 
@@ -68,22 +72,22 @@ npm install -g @xiaofuzhou/cce
 ## 快速开始
 
 ```bash
-# 1. 打开配置添加你的 env（首次运行 cce 会写入一份起始文件）
+# 1. 打开配置文件，添加你的服务商（首次运行 cce 会自动写入一份带示例的起始文件）
 cce edit
 
-# 2. 看看都有哪些 env（* 标记默认项）
+# 2. 看看配置了哪些（* 号标记的是默认项）
 cce list
 
-# 3. 设一个默认，裸 `cce` 就会用它
+# 3. 指定一个默认，之后直接敲 cce 就用它
 cce use deepseek
 
-# 4. 用默认 env 启动 claude
+# 4. 用默认配置启动 claude
 cce
 
-# 5. ……或交互式选择
+# 5. ……或者弹出菜单手动挑一个
 cce pick
 
-# 6. 传入额外的 claude 参数（与配置默认合并）
+# 6. 启动时临时追加 claude 的参数（叠加在配置的默认参数之上）
 cce -e kimi -a "--permission-mode bypassPermissions"
 ```
 
@@ -96,7 +100,7 @@ cce -e kimi -a "--permission-mode bypassPermissions"
   "args": "--permission-mode bypassPermissions",
   "envs": {
     "deepseek": {
-      "description": "DeepSeek（Anthropic 兼容端点）",
+      "description": "DeepSeek（兼容 Claude 接口）",
       "env": {
         "ANTHROPIC_BASE_URL":   "https://api.deepseek.com/anthropic",
         "ANTHROPIC_AUTH_TOKEN": "sk-xxxxxxxxxxxx",
@@ -115,9 +119,9 @@ cce -e kimi -a "--permission-mode bypassPermissions"
 }
 ```
 
-> ⚠ **记住一条规则：** 所有 claude 的 CLI flag 都要包在 `-a "..."`（合并）或
-> `-A "..."`（覆盖）里。`cce` **不会**直接透传未知 flag —— 这保证它永远不会与
-> claude 未来新增的 flag 冲突。
+> ⚠ **记住一条规则：** 所有要传给 claude 的命令行参数，都得包在 `-a "..."`（追加）或
+> `-A "..."`（整组覆盖）里。`cce` **不会**把它不认识的参数直接转交给 claude —— 这样它就
+> 永远不会和 claude 将来新增的参数撞车。
 
 ---
 
@@ -134,8 +138,8 @@ cce -e kimi -a "--permission-mode bypassPermissions"
 
 ## 与 cc-switch / claude-code-router 的关系
 
-- **cc-switch** —— GUI 全局切换工具，与本工具不冲突。`cc-switch` 改 `~/.claude/settings.json` 当全局默认，`cce` 在子进程级覆盖，两者可共存。
-- **claude-code-router (CCR)** —— 把 CCR 配成 `cce` 的一个 env 即可（`ANTHROPIC_BASE_URL=http://127.0.0.1:3456`），需要时 `cce -e ccr` 走路由，不需要时直连其他 provider。
+- **cc-switch** —— 图形界面的全局切换工具，与本工具不冲突。`cc-switch` 改 `~/.claude/settings.json` 当全局默认，`cce` 则在每个子进程里临时覆盖，两者可共存。
+- **claude-code-router (CCR)** —— 把 CCR 当成 `cce` 的一个 env 配进去即可（接口地址填 `ANTHROPIC_BASE_URL=http://127.0.0.1:3456`），需要时 `cce -e ccr` 走它路由，不需要时直连其他服务商。
 
 ---
 

@@ -9,14 +9,15 @@
 这是 **`cce`**（Claude Code Env Launcher）的完整参考。快速入门与安装说明见
 [README](../README.md)。
 
-> **一句话模型：** `cce` 读取一份记录了若干命名 *env* 的小配置，把你选中的那个注入到一个
-> 全新的 `claude` 子进程，并以 claude 的退出码退出。全程不碰任何全局状态 —— 每个终端窗口
-> 都能并行跑不同的 provider。
+> **一句话理解：** `cce` 读取一份小配置，里面记录了若干套**启动配置**（每套叫一个 *env*）。
+> 启动时它把你选中的那套注入到一个**全新的 `claude` 子进程**；claude 退出时 cce 也跟着退出，
+> 并原样返回它的退出码。全程不动任何全局设置 —— 每个终端窗口都能同时用不同的 env。
 
 ---
 
 ## 目录
 
+- [术语速查](#术语速查)
 - [概念](#概念)
 - [命令参考](#命令参考)
   - [启动模式](#启动模式)
@@ -36,25 +37,43 @@
 - [多语言](#多语言)
 - [交互式选择器](#交互式选择器)
 - [Shell 补全](#shell-补全)
+- [更新 cce](#更新-cce)
 - [环境变量](#环境变量)
 - [排错](#排错)
 
 ---
 
+## 术语速查
+
+第一次读文档可能会遇到几个词，这里先一次性解释清楚，后文不再重复：
+
+| 词 | 含义 |
+|---|---|
+| **服务商（provider）** | 提供 Claude 模型、或提供「兼容 Claude 接口」的一方。例如 DeepSeek、Kimi（月之暗面）、智谱 GLM、Anthropic 官方，或你自建的代理。每个服务商都有自己的**接口地址**和**密钥**。一个 env 会指向某个服务商，但反过来**一个服务商可以对应多个 env**。 |
+| **env（启动配置）** | cce 里你自己创建的一套**启动配置**，起个名字（如 `deepseek`、`kimi-fast`）。它记录这一套「怎么启动 claude」：用哪个服务商、什么接口地址和密钥、哪个模型、默认带哪些参数。**同一个服务商可以建多套 env**（比如同一家配不同模型、不同密钥或不同默认参数）。之后用 `cce -e <名字>` 点名启动其中一套。本文里「env」「启动配置」是同一个意思。 |
+| **token（密钥/令牌）** | 访问服务商接口用的钥匙（一长串字符），相当于密码，泄露了别人就能用你的额度。 |
+| **`~/.claude/settings.json`** | Claude Code **自己的**配置文件（不是 cce 的）。cce 只读它、**绝不改写**它。 |
+| **参数 / flag** | 跟在命令后面的选项，例如 `--permission-mode bypassPermissions`、`--resume`。 |
+| **TTY（终端）** | 你手动敲命令的那个命令行窗口。文中说「需要 TTY」就是指「需要真人在终端里操作」—— 脚本、管道、CI 里没有 TTY，那些交互式菜单就用不了。 |
+| **shell** | 命令行环境本身，比如 Windows 的 PowerShell、macOS/Linux 的 bash / zsh / fish。 |
+
+---
+
 ## 概念
 
-一个 **env** 是一组命名的环境变量（外加可选的默认 claude 参数）。其中的 `env` 块与
-Claude Code 自己的 `~/.claude/settings.json` `env` 块**结构完全一致**，所以你可以把 provider
-配置块直接复制粘贴进来。
+一个 **env** 就是一套起了名字的启动配置（一些环境变量，外加可选的默认 claude 参数）。它指向某个
+服务商，但不等于服务商本身 —— **同一个服务商可以建多套 env**（比如换模型、换密钥、换默认参数）。
+其中的 `env` 块和 Claude Code 自己的 `~/.claude/settings.json` 里的 `env` 块**结构完全一样**，
+所以你可以把服务商文档里给的配置块直接复制粘贴进来。
 
-`cce` *只是一个启动器*。它不代理流量、不常驻后台、不修改任何全局状态。当你运行
+`cce` *只是一个启动器*：它不代理网络流量、不在后台常驻、也不修改任何全局设置。当你运行
 `cce -e deepseek` 时：
 
 1. 读取 `~/.claude/cce/config.json`。
 2. 解析 `deepseek` 这个 env（并展开其中的 `${VAR}` 占位符）。
 3. 把该 env 与你的 `~/.claude/settings.json` 合并（见
    [settings.json 合并](#settingsjson-合并)）。
-4. 以 `stdio: 'inherit'` 启动 `claude`，因此 claude 的交互式界面与你直接运行它时完全一样。
+4. 以「直接接管你当前终端的输入输出」的方式启动 `claude`，所以 claude 的交互界面和你直接运行它时一模一样。
 5. claude 退出时，`cce` 透传其退出码，并删除临时文件（若有）。
 
 ---
@@ -103,6 +122,7 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 | `lang [en\|zh-CN\|auto]` | 查看或设置界面语言（持久写入配置）。见 [多语言](#多语言)。 |
 | `pick [-a/-A/-m ...]` | 从菜单交互式选择一个 env，然后启动 claude。 |
 | `completion <shell>` | 打印 shell 补全脚本（`bash`/`zsh`/`fish`/`powershell`）。 |
+| `update [--check]` | 把 cce 自己升级到 npm 上的最新版。加 `--check` 只检查、不安装。详见 [更新 cce](#更新-cce)。 |
 | `help` | 显示帮助。 |
 
 > 这里**故意不提供** `cce add` / `cce remove`。增、改、删 env 都走 `cce edit`，直接打开 JSON。
@@ -121,6 +141,8 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 
 用 `CCE_CONFIG_HOME` 环境变量可覆盖该目录（便于 CI 或团队约定）。首次运行时若不存在会写入一份起始配置。
 
+> 同一目录下还有一个 `update-check.json`，是 cce **自动管理**的更新检查缓存（记录上次检查时间、查到的最新版本等），不需要你手动编辑。
+
 ### 完整 schema
 
 | 字段 | 类型 | 必填 | 说明 |
@@ -130,9 +152,10 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 | `lang` | `"en"` \| `"zh-CN"` \| null | 否 | 界面语言。`null` = 从系统 locale 自动检测。可被 `CCE_LANG` 覆盖；用 `cce lang` 设置。 |
 | `args` | string | 否 | **全局**默认 claude CLI 参数（shell 分词）。前置注入到每次启动。 |
 | `settingsMode` | `"override"` \| `"merge-cce"` \| `"merge-claude"` | 否 | **全局**默认合并模式。默认 `override`。 |
+| `updateMode` | `"auto"` \| `"prompt"` \| `"off"` | 否 | 启动时如何处理自我更新。默认 `auto`。见 [更新 cce](#更新-cce)。 |
 | `envs.<name>` | object | 是 | 一个命名 env。键名就是你传给 `-e` 的值。必须匹配 `[A-Za-z0-9][A-Za-z0-9._-]*`。 |
 | `envs.<name>.description` | string | 否 | 在 `cce list` 和 `cce show` 中展示。 |
-| `envs.<name>.env` | object | 是 | 为该 provider 注入的环境变量。结构与 claude `settings.json` 的 `env` 块一致。值可含 `${VAR}` 占位符，启动时从父 shell 环境解析。 |
+| `envs.<name>.env` | object | 是 | 为该服务商注入的环境变量。结构与 claude `settings.json` 的 `env` 块一致。值可含 `${VAR}` 占位符，启动时从你命令行环境里解析。 |
 | `envs.<name>.args` | string | 否 | 该 env 的 claude 参数。默认合并到全局 `args` 之上。 |
 | `envs.<name>.argsOverride` | boolean | 否 | 默认 `false`。为 `true` 时，该 env 的 `args` **替换**全局 `args`。 |
 | `envs.<name>.settingsMode` | enum | 否 | 该 env 的合并模式覆盖。省略则继承全局 `settingsMode`。 |
@@ -155,9 +178,12 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
   // 全局默认：env 的 `env` 如何与 ~/.claude/settings.json 合并。
   "settingsMode": "override",
 
+  // 启动时如何自我更新：auto = 后台自动更新（默认）；prompt = 问你；off = 不检查。
+  "updateMode": "auto",
+
   "envs": {
     "deepseek": {
-      "description": "DeepSeek（Anthropic 兼容端点）",
+      "description": "DeepSeek（兼容 Claude 接口）",
       // 该 env 的参数合并到全局之上 → 实际生效：
       //   --permission-mode bypassPermissions --add-dir D:\\code
       "args": "--add-dir D:\\code",
@@ -200,8 +226,8 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 | 层 | 来源 | 备注 |
 |---|---|---|
 | 1. 全局 | 配置根的 `args` | 应用到每次启动。 |
-| 2. per-env | `envs.<name>.args` + `argsOverride` | `argsOverride: true` 时该 env *替换*全局层。 |
-| 3. CLI | `-a "..."` / `-A "..."` | `-a` 追加；`-A` 替换其下所有层。 |
+| 2. 按 env（单个 env 专属） | `envs.<name>.args` + `argsOverride` | `argsOverride: true` 时该 env *替换*全局层。 |
+| 3. 命令行 | `-a "..."` / `-A "..."` | `-a` 追加；`-A` 替换其下所有层。 |
 
 合并是**纯拼接 —— cce 从不去重**：
 
@@ -209,8 +235,8 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 最终 = (env.argsOverride ? "" : 全局 args) + " " + env.args + " " + 所有 -a "..."
 ```
 
-结果经 shell 分词成 argv 后交给 claude，由 claude 自己处理重复（大多数 flag 是 last-wins；
-像 `--add-dir` 这种可重复 flag 会叠加）。要强制使用一组精确参数，用 `-A`。
+这串文本会按命令行规则拆成一个个参数后交给 claude，由 claude 自己处理重复（大多数参数是「后者覆盖前者」；
+像 `--add-dir` 这种可重复的参数则会叠加）。要强制只用一组精确参数，用 `-A`。
 
 | 命令 | 实际启动 |
 |---|---|
@@ -229,7 +255,7 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 
 ### 问题
 
-`cce` 把 provider env 注入到 `claude` 子进程 —— 但 Claude Code *同时也会*读取你
+`cce` 把服务商的 env 注入到 `claude` 子进程 —— 但 Claude Code *同时也会*读取你
 `~/.claude/settings.json` 里的 `env` 块。如果那个文件里还残留着、比如一个旧的
 `ANTHROPIC_BASE_URL`，它可能悄悄盖过来，让你的 env 切换静默失效。
 
@@ -394,6 +420,49 @@ cce lang <Tab>     # → en  zh-CN  auto
 
 ---
 
+## 更新 cce
+
+cce 可以把**自己**升级到 npm 上的最新版本，分**手动**和**启动时自动**两种方式。
+
+### 手动更新
+
+```bash
+cce update          # 检查最新版；有新版就直接用 npm 安装
+cce update --check  # 只检查、并告诉你有没有新版，不安装
+```
+
+`cce update` 每次都会**实时查询** npm，所以结果永远是最新的（不受下面的缓存影响）。它底层执行的就是 `npm i -g @xiaofuzhou/cce@latest`。
+
+> 如果你是从源码（`git clone`）运行的 cce，`cce update` 会提醒你用 `git pull` 更新，而不会去 npm 重装、把你的源码目录搞乱。
+
+### 启动时自动检查
+
+每次用 cce 启动 claude 时，它会顺手在**后台**看一眼有没有新版本 —— 这一步**不会拖慢启动**（用的是本地缓存，联网查询在后台进行）。具体怎么处理，由配置里的 `updateMode` 决定：
+
+| `updateMode` | 行为 |
+|---|---|
+| `auto`（默认） | 发现新版后，在后台**静默更新**；装好后，下次启动时会提示一句「已在后台更新到 vX.Y.Z」。全程不打断你。 |
+| `prompt` | **不自动装**。下次你在终端里启动 cce 时，弹一个菜单让你选「**立即更新** / **跳过此版本**」。选「跳过」后这个版本就不再提示，等更出新的版本时再问你。 |
+| `off` | 启动时**完全不检查**（仍可手动 `cce update`）。 |
+
+用 `cce edit` 打开配置，改根部的 `updateMode` 即可：
+
+```jsonc
+{
+  "updateMode": "prompt",
+  ...
+}
+```
+
+**几个细节：**
+
+- **检查结果缓存约 3 小时**：所以启动时既不会频繁联网，也不会每次都来打扰你。
+- **只在真人操作的终端（TTY）里**才会弹「立即更新 / 跳过」菜单；脚本、管道、CI 等没有 TTY 的场景下，既不弹窗也不打印，绝不卡住流程。
+- 想**临时关掉**某一次启动的检查：设环境变量 `CCE_NO_UPDATE_CHECK=1`。
+- 更新装好后，需要**重新运行 cce**才会用上新版本（正在运行的这一次不受影响）。
+
+---
+
 ## 环境变量
 
 | 变量 | 用途 |
@@ -402,6 +471,7 @@ cce lang <Tab>     # → en  zh-CN  auto
 | `CLAUDE_CONFIG_DIR` | cce 从哪里读 claude 的 `settings.json`（默认 `~/.claude/`）。与 claude 自己的变量一致。 |
 | `CCE_CLAUDE_BIN` | `claude` 可执行文件的完整路径（跳过 PATH 查找）。 |
 | `CCE_LANG` | 本次运行的界面语言（`en` \| `zh-CN`）；高于配置。持久设置用 `cce lang`。 |
+| `CCE_NO_UPDATE_CHECK=1` | 本次运行禁用启动时的更新检查（见 [更新 cce](#更新-cce)）。 |
 | `CCE_QUIET=1` | 隐藏 `[cce]` 启动提示行。 |
 | `CCE_DEBUG=1` | 内部错误时打印堆栈。 |
 

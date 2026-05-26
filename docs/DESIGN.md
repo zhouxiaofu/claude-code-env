@@ -120,6 +120,9 @@ cce -e deepseek -A                               # 完全无 args，裸 claude
 | `cce use --none` | 清除默认，裸 `cce` 时不注入任何 env |
 | `cce current` | 打印当前默认 env 名 |
 | `cce pick [-a "..."] [-A "..."]` | **交互式菜单**选 env，选完直接 spawn claude（`-a`/`-A` 同启动模式） |
+| `cce completion <shell>` | 输出 shell 补全脚本（bash/zsh/fish/powershell） |
+| `cce lang [en\|zh-CN\|auto]` | 查看/设置界面语言（持久写入 config） |
+| `cce update [--check]` | 把 cce 自己升级到 npm 最新版（`--check` 只查不装）—— 见 §11.5 |
 | `cce --help` / `cce -h` | 帮助 |
 | `cce --version` / `cce -v` | 版本号 |
 
@@ -691,3 +694,41 @@ cce 只是启动器，与生态里的其他工具不互斥，反而能叠加：
 ```
 
 新增 CLI：`-m/--merge-mode <override|cce|claude>`（启动修饰符）、`cce lang [en|zh-CN|auto]`（子命令）。新增 env 读取点尊重 `CLAUDE_CONFIG_DIR`（与 claude 一致）。
+
+---
+
+## 14. 自我更新（手动 + 启动时自动）
+
+cce 发布在 npm（`@xiaofuzhou/cce`），所谓「更新」本质就是**查 npm 上的最新版 → 触发全局重装**。核心放在 `src/update.js`，命令在 `src/commands/update.js`，启动钩子挂在 `runLaunch` 和 `cce pick`。
+
+### 14.1 设计原则
+
+- **零新依赖**：版本查询用 Node 18+ 自带的全局 `fetch` 打 npm registry 的轻量端点 `…/@xiaofuzhou/cce/latest`；semver 比较自写约 40 行（含 prerelease），不引 `semver` 包，延续 §1 的最小依赖原则。
+- **绝不拖慢启动**：启动时的检查只读本地缓存（零延迟）；真正的联网查询在后台进行（fire-and-forget，借 claude 子进程让父进程存活期间完成），结果写入缓存供**下次**启动用。
+- **状态与配置分离**：检查缓存写在独立的 `~/.claude/cce/update-check.json`（机器管理），不污染用户手编的 `config.json`。字段：`lastCheckAt` / `latestVersion` / `skippedVersion` / `autoUpdatePending`。
+- **包管理器只用 npm**：统一 `npm i -g @xiaofuzhou/cce@latest`，不做 pnpm/yarn/bun 探测（实现简单、可预测）。
+
+### 14.2 三种模式（config `updateMode`，默认 `auto`）
+
+| 模式 | 启动时行为 |
+|---|---|
+| `auto`（默认） | 缓存里有更新 → 后台 detached `npm i -g`（同一目标版只触发一次，靠 `autoUpdatePending` 去重）；装好后下次启动检测到 `current` 已追平，打一行「已在后台更新到 vX」并清除标记 |
+| `prompt` | **仅 TTY** 下弹 `picker`「立即更新 / 跳过此版本」；跳过记 `skippedVersion`，`latest === skipped` 时不再问，出更新版本再问。非 TTY 什么都不做、不打印、不阻塞 |
+| `off` | 启动时完全不检查 |
+
+另有 `CCE_NO_UPDATE_CHECK=1` 环境变量做单次关闭出口。
+
+### 14.3 关键取舍
+
+- **为什么 prompt 模式非 TTY 不打印提示**：脚本 / 管道 / CI 里没人看输出，提示纯属噪音；真要自动化更新会显式跑 `cce update`，不该靠启动提示。所以非 TTY 直接静默跳过。
+- **节流 3h**：`lastCheckAt` 距今 < 3h 就跳过后台刷新，既不频繁联网也不每次打扰；但**手动 `cce update` 不受节流**，每次实时查 registry。
+- **git checkout 守卫**：`isGitCheckout()`（检测包根有 `.git`）为真时，启动钩子与 `cce update` 都拒绝 npm 重装，提示用 `git pull`——避免在源码开发目录里误操作。
+- **更新落地的时机**：重装的是全局文件，但当前 cce 进程已把代码读进内存，本次运行不受影响；需**重新运行 cce** 才用上新版本。auto 模式正是利用这点在后台安全重装。
+
+### 14.4 新增字段 / CLI
+
+```jsonc
+{ "updateMode": "auto" }   // "auto" | "prompt" | "off"，默认 auto
+```
+
+新增子命令 `cce update [--check]`；新增环境变量 `CCE_NO_UPDATE_CHECK`；新增状态文件 `~/.claude/cce/update-check.json`。i18n 新增 `update.*` 键（en/zh 各一套），help / completion 同步。

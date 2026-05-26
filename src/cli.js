@@ -64,6 +64,7 @@ async function runSubcommand(name, args) {
     case 'lang':       return require('./commands/lang').run(args);
     case 'pick':       return await require('./commands/pick').run(args);
     case 'completion': return require('./commands/completion').run(args);
+    case 'update':     return await require('./commands/update').run(args);
     case 'help':       return require('./commands/help').run();
     default:
       log.error(`Unknown subcommand: ${name}`);
@@ -72,6 +73,10 @@ async function runSubcommand(name, args) {
 }
 
 async function runLaunch({ envName: envArg, mergeArgs, overrideArg, settingsMode }) {
+  // Self-update check before launching claude (notify/auto per config). Fully
+  // guarded — never blocks or breaks the launch.
+  await require('./update').maybeCheckOnLaunch();
+
   const cfg = config.load();
   let envName = envArg || cfg.default || null;
 

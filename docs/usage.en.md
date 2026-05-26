@@ -37,6 +37,7 @@ quick introduction and install instructions, see the [README](../README.en.md).
 - [Language / i18n](#language--i18n)
 - [Interactive picker](#interactive-picker)
 - [Shell completion](#shell-completion)
+- [Updating cce](#updating-cce)
 - [Environment variables](#environment-variables)
 - [Troubleshooting](#troubleshooting)
 
@@ -106,6 +107,7 @@ cce -e kimi -m cce                               # merge env with settings.json,
 | `lang [en\|zh-CN\|auto]` | Show or set the UI language (persists to config). See [Language / i18n](#language--i18n). |
 | `pick [-a/-A/-m ...]` | Interactively pick an env from a menu, then launch claude. |
 | `completion <shell>` | Print a shell completion script (`bash`/`zsh`/`fish`/`powershell`). |
+| `update [--check]` | Update cce itself to the latest npm version. Add `--check` to report only, without installing. See [Updating cce](#updating-cce). |
 | `help` | Show help. |
 
 > There is intentionally **no** `cce add` / `cce remove`. Adding, editing, and
@@ -127,6 +129,10 @@ cce -e kimi -m cce                               # merge env with settings.json,
 Override the directory with the `CCE_CONFIG_HOME` env var (useful for CI or team
 conventions). The first run writes a starter config if none exists.
 
+> The same directory also holds an `update-check.json` — a cce-managed cache for
+> the update check (last-check time, the latest version seen, etc.). You never
+> need to edit it by hand.
+
 ### Full schema
 
 | Field | Type | Required | Description |
@@ -136,6 +142,7 @@ conventions). The first run writes a starter config if none exists.
 | `lang` | `"en"` \| `"zh-CN"` \| null | no | UI language. `null` = auto-detect from OS locale. Overridden by `CCE_LANG`; set with `cce lang`. |
 | `args` | string | no | **Global** default claude CLI args (shell-tokenized). Prepended to every launch. |
 | `settingsMode` | `"override"` \| `"merge-cce"` \| `"merge-claude"` | no | **Global** default reconciliation mode. Default `override`. |
+| `updateMode` | `"auto"` \| `"prompt"` \| `"off"` | no | How self-update behaves at launch. Default `auto`. See [Updating cce](#updating-cce). |
 | `envs.<name>` | object | yes | A named env. The key is what you pass to `-e`. Must match `[A-Za-z0-9][A-Za-z0-9._-]*`. |
 | `envs.<name>.description` | string | no | Shown in `cce list` and `cce show`. |
 | `envs.<name>.env` | object | yes | Env vars injected for this provider. Same shape as claude's `settings.json` `env` block. Values may contain `${VAR}` placeholders, resolved from the parent shell at launch. |
@@ -418,6 +425,59 @@ cce lang <Tab>     # → en  zh-CN  auto
 
 ---
 
+## Updating cce
+
+cce can upgrade **itself** to the latest npm version, either **manually** or
+**automatically at launch**.
+
+### Manual update
+
+```bash
+cce update          # check for the latest version; install it if newer
+cce update --check  # check and report only, never install
+```
+
+`cce update` always queries npm **live**, so its result is always current
+(unaffected by the cache below). Under the hood it runs
+`npm i -g @xiaofuzhou/cce@latest`.
+
+> If you're running cce from a source checkout (`git clone`), `cce update` tells
+> you to update with `git pull` instead of reinstalling over your working tree.
+
+### Automatic check at launch
+
+Every time cce launches claude, it also takes a quick look in the **background**
+for a newer version — this **never slows down the launch** (it reads a local
+cache; the network check happens in the background). What it does with the
+result is controlled by `updateMode` in your config:
+
+| `updateMode` | Behavior |
+|---|---|
+| `auto` (default) | When a newer version is found, update **silently in the background**; on the next launch it prints one line: "cce was updated to vX.Y.Z in the background". Never interrupts you. |
+| `prompt` | **Don't auto-install.** On your next launch in a terminal, show a menu to choose **Update now** / **Skip this version**. After "Skip", that version is never offered again until a newer one ships. |
+| `off` | **Never check** at launch (manual `cce update` still works). |
+
+Set it by opening the config with `cce edit` and editing the root `updateMode`:
+
+```jsonc
+{
+  "updateMode": "prompt",
+  ...
+}
+```
+
+**A few details:**
+
+- The check result is **cached for ~3 hours**, so launches neither hit the
+  network constantly nor nag you every time.
+- The **Update now / Skip** menu only appears in a real interactive terminal
+  (TTY). In non-TTY contexts (scripts, pipes, CI) it shows nothing and never
+  blocks.
+- After an install, you must **re-run cce** to use the new version (the
+  currently running process is unaffected).
+
+---
+
 ## Environment variables
 
 | Variable | Purpose |
@@ -426,6 +486,7 @@ cce lang <Tab>     # → en  zh-CN  auto
 | `CLAUDE_CONFIG_DIR` | Where cce reads claude's `settings.json` (default `~/.claude/`). Mirrors claude's own var. |
 | `CCE_CLAUDE_BIN` | Full path to the `claude` executable (skip PATH lookup). |
 | `CCE_LANG` | UI language for this run (`en` \| `zh-CN`); overrides config. Persist with `cce lang`. |
+| `CCE_NO_UPDATE_CHECK=1` | Disable the launch-time update check for this run (see [Updating cce](#updating-cce)). |
 | `CCE_QUIET=1` | Suppress the `[cce]` startup lines. |
 | `CCE_DEBUG=1` | Print stack traces on internal errors. |
 

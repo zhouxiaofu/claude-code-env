@@ -44,7 +44,7 @@ function run(args) {
   }
 }
 
-const SUB = ['list', 'ls', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'help'];
+const SUB = ['list', 'ls', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'update', 'help'];
 const TOP_FLAGS = ['-e', '--env', '-a', '-A', '-m', '--merge-mode', '-h', '--help', '-v', '--version'];
 const MERGE_MODES = ['override', 'cce', 'claude'];
 const LANGS = ['en', 'zh-CN', 'auto'];
@@ -67,6 +67,10 @@ _cce_completion() {
       ;;
     completion)
       COMPREPLY=( $(compgen -W "bash zsh powershell fish" -- "$cur") )
+      return 0
+      ;;
+    update)
+      COMPREPLY=( $(compgen -W "--check" -- "$cur") )
       return 0
       ;;
     -m|--merge-mode)
@@ -111,6 +115,10 @@ _cce() {
       compadd -- bash zsh powershell fish
       return
       ;;
+    update)
+      compadd -- --check
+      return
+      ;;
     -m|--merge-mode)
       compadd -- ${MERGE_MODES.join(' ')}
       return
@@ -138,7 +146,7 @@ function __cce_envs
 end
 
 # Subcommands (only when no subcommand has been typed yet)
-complete -c cce -n '__fish_use_subcommand' -a 'list ls show edit use current lang pick completion help'
+complete -c cce -n '__fish_use_subcommand' -a 'list ls show edit use current lang pick completion update help'
 complete -c cce -n '__fish_use_subcommand' -s e -l env -a '(__cce_envs)' -d 'Use an env'
 complete -c cce -n '__fish_use_subcommand' -s a -d 'Merge claude args'
 complete -c cce -n '__fish_use_subcommand' -s A -d 'Override claude args'
@@ -151,6 +159,7 @@ for cmd in use show
 end
 complete -c cce -n '__fish_seen_subcommand_from completion' -a 'bash zsh powershell fish'
 complete -c cce -n '__fish_seen_subcommand_from lang' -a 'en zh-CN auto'
+complete -c cce -n '__fish_seen_subcommand_from update' -a '--check'
 
 # -e/--env arg completion at any position before pass-through
 complete -c cce -s e -l env -a '(__cce_envs)' -d 'Use an env'
@@ -175,7 +184,7 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
         } catch { @() }
     }
 
-    $subcommands = @('list','ls','show','edit','use','current','lang','pick','completion','help')
+    $subcommands = @('list','ls','show','edit','use','current','lang','pick','completion','update','help')
     $flags       = @('-e','--env','-m','--merge-mode','-h','--help','-v','--version')
 
     # Complete env names after these tokens
@@ -199,6 +208,12 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
 
     if ($prev -eq 'lang') {
         @('en','zh-CN','auto') | Where-Object { $_ -like "$wordToComplete*" } |
+            ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+        return
+    }
+
+    if ($prev -eq 'update') {
+        @('--check') | Where-Object { $_ -like "$wordToComplete*" } |
             ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
         return
     }

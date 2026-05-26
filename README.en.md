@@ -44,6 +44,7 @@ windows use two providers at once. `cce` injects env vars **only into the
 - 🪟 **Per-process isolation** — run different providers in different windows simultaneously; your shell and system env are never modified.
 - ⚙️ **Default args management** — store common claude flags (e.g. `--permission-mode bypassPermissions`) globally or per-env; `-a` to merge, `-A` to override.
 - 🔀 **settings.json reconciliation** — three modes (`override` / `cce` / `claude`) decide how an env merges with your `~/.claude/settings.json`. cce **never edits** that file; it builds a short-lived temp file and runs `claude --settings`.
+- 🔄 **Self-update** — `cce update` upgrades to the latest npm version; launches can also auto-update in the background or prompt you (see [Updating cce](docs/usage.en.md#updating-cce)).
 - 🎛️ **Interactive picker** — `cce pick` for an arrow-key menu.
 - 🌐 **Multi-language UI** — English and 简体中文, auto-detected, switchable with `cce lang`.
 - 🐚 **Shell completion** — bash, zsh, fish, PowerShell, including your own env names.

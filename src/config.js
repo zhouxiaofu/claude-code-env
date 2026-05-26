@@ -23,6 +23,13 @@ const KNOWN_ANTHROPIC_VARS = [
 const SETTINGS_MODES = ['override', 'merge-cce', 'merge-claude'];
 const DEFAULT_SETTINGS_MODE = 'override';
 
+// Self-update behavior on launch.
+//   auto   — silently update in the background when a newer version is found
+//   prompt — ask (Update now / Skip this version) on the next interactive launch
+//   off    — never check at launch (manual `cce update` still works)
+const UPDATE_MODES = ['auto', 'prompt', 'off'];
+const DEFAULT_UPDATE_MODE = 'auto';
+
 function getConfigDir() {
   if (process.env.CCE_CONFIG_HOME) {
     return path.resolve(process.env.CCE_CONFIG_HOME);
@@ -54,6 +61,7 @@ function defaultConfig() {
     lang: null,
     args: '',
     settingsMode: DEFAULT_SETTINGS_MODE,
+    updateMode: DEFAULT_UPDATE_MODE,
     envs: {},
   };
 }
@@ -107,6 +115,7 @@ function normalize(cfg) {
     }
     const rootMode = normalizeMode(cfg.settingsMode);
     if (rootMode) out.settingsMode = rootMode;
+    if (UPDATE_MODES.includes(cfg.updateMode)) out.updateMode = cfg.updateMode;
     if (cfg.envs && typeof cfg.envs === 'object') {
       for (const [name, entry] of Object.entries(cfg.envs)) {
         if (!entry || typeof entry !== 'object') continue;
@@ -208,6 +217,8 @@ module.exports = {
   KNOWN_ANTHROPIC_VARS,
   SETTINGS_MODES,
   DEFAULT_SETTINGS_MODE,
+  UPDATE_MODES,
+  DEFAULT_UPDATE_MODE,
   getConfigDir,
   getConfigPath,
   getClaudeDir,

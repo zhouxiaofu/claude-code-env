@@ -32,6 +32,7 @@ function helpEn() {
     `  lang [en|zh-CN|auto]    Show or set the UI language (persists to config)`,
     `  pick [-a/-A/-m ...]     Interactively pick an env, then launch claude`,
     `  completion <shell>      Output shell completion script (bash|zsh|powershell|fish)`,
+    `  update [--check]        Update cce to the latest npm version (--check: report only)`,
     `  help                    Show this help`,
     '',
     pc.bold('SETTINGS MERGE MODES') + pc.dim('  (how env reconciles with ~/.claude/settings.json)'),
@@ -58,6 +59,7 @@ function helpEn() {
     `  CCE_LANG          UI language for this run (en | zh-CN); overrides config. Persist: \`cce lang\``,
     `  CCE_QUIET=1       Suppress the [cce] startup lines`,
     `  CCE_DEBUG=1       Print stack traces on internal errors`,
+    `  CCE_NO_UPDATE_CHECK=1  Disable the launch-time update check for this run`,
     '',
     pc.dim('Config: ~/.claude/cce/config.json'),
   ].join('\n');
@@ -90,6 +92,7 @@ function helpZh() {
     `  lang [en|zh-CN|auto]    查看或设置界面语言（持久写入配置）`,
     `  pick [-a/-A/-m ...]     交互式选择 env，然后启动 claude`,
     `  completion <shell>      输出 shell 补全脚本（bash|zsh|powershell|fish）`,
+    `  update [--check]        把 cce 更新到 npm 最新版（--check：仅检查不安装）`,
     `  help                    显示帮助`,
     '',
     pc.bold('合并模式') + pc.dim('  （env 如何与 ~/.claude/settings.json 合并）'),
@@ -116,6 +119,7 @@ function helpZh() {
     `  CCE_LANG          本次运行的界面语言（en | zh-CN）；高于配置。持久设置：\`cce lang\``,
     `  CCE_QUIET=1       隐藏 [cce] 启动提示行`,
     `  CCE_DEBUG=1       内部错误时打印堆栈`,
+    `  CCE_NO_UPDATE_CHECK=1  本次运行禁用启动时的更新检查`,
     '',
     pc.dim('配置文件：~/.claude/cce/config.json'),
   ].join('\n');

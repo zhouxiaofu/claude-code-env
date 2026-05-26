@@ -66,6 +66,9 @@ async function run(args) {
     throw e;
   }
 
+  // Same launch-time self-update check as bare `cce` / `cce -e`.
+  await require('../update').maybeCheckOnLaunch();
+
   const cfg = config.load();
   const chosen = await pickFromConfig(cfg);
   if (!chosen) {

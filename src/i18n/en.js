@@ -97,6 +97,22 @@ module.exports = {
   // completion
   'completion.usage': 'Usage: cce completion <bash|zsh|powershell|fish>',
 
+  // update
+  'update.checking': 'Checking for updates…',
+  'update.checkFailed': 'Could not reach the npm registry. Check your network and try again.',
+  'update.upToDate': 'cce is up to date (v{version}).',
+  'update.available': 'Update available: {current} → {latest}',
+  'update.runToInstall': 'Run `cce update` to install it.',
+  'update.installing': 'Installing {latest} via npm…',
+  'update.installed': 'Updated to v{version}. Restart cce to use the new version.',
+  'update.installFailed': 'npm install failed. Try manually: npm i -g {spec}',
+  'update.gitCheckout': 'This looks like a git checkout — update with `git pull`, not npm.',
+  'update.promptTitle': 'cce v{latest} is available (you have v{current}). Update now?',
+  'update.choiceUpdate': 'Update now',
+  'update.choiceSkip': 'Skip this version',
+  'update.skipped': 'Skipping v{version} — you will be reminded when a newer version ships.',
+  'update.autoDone': 'cce was updated to v{version} in the background.',
+
   // config
   'config.readFailed': 'Failed to read config at {file}: {message}',
   'config.invalidJson':

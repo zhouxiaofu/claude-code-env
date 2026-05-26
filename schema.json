@@ -29,6 +29,12 @@
       "default": "override",
       "description": "Global default for how a selected env's `env` reconciles with ~/.claude/settings.json's `env` (cce never edits settings.json; it builds a temp file passed to `claude --settings`). override: this env fully wins, stale anthropic keys in settings.json are neutralized. merge-cce: union, this env wins on conflicts. merge-claude: union, settings.json wins on conflicts. Overridden per-env by `envs.<name>.settingsMode` and per-run by the -m/--merge-mode flag."
     },
+    "updateMode": {
+      "type": "string",
+      "enum": ["auto", "prompt", "off"],
+      "default": "auto",
+      "description": "How cce self-updates at launch. auto (default): silently install a newer version in the background. prompt: on the next interactive launch, show an Update now / Skip this version menu (a skipped version is not offered again until a newer one ships). off: never check at launch. Manual `cce update` works regardless. The launch check is throttled to ~3h and only prompts in a TTY; disable a single run with CCE_NO_UPDATE_CHECK=1."
+    },
     "envs": {
       "type": "object",
       "patternProperties": {

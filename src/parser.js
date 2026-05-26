@@ -23,6 +23,7 @@ const SUBCOMMANDS = new Set([
   'lang',
   'pick',
   'completion',
+  'update',
   'help',
 ]);
 
