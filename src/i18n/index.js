@@ -77,8 +77,29 @@ function t(key, params) {
   return s;
 }
 
+// Resolve a possibly-multilingual value (used by templates' descriptions) to a
+// single display string for the current UI language. Accepts:
+//   - a plain string  → returned as-is (back-compat with single-language data)
+//   - an object keyed by lang, e.g. { en: '…', 'zh-CN': '…' }
+// Fallback chain for the object form: current lang → en → first non-empty value.
+// null / non-object / an object with no non-empty string values → '' (caller
+// should then render nothing).
+function localize(value, lang = currentLang) {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  const entries = Object.entries(value).filter(
+    ([, v]) => typeof v === 'string' && v.trim() !== ''
+  );
+  if (entries.length === 0) return '';
+  const map = Object.fromEntries(entries);
+  if (map[lang]) return map[lang];
+  if (map[DEFAULT_LANG]) return map[DEFAULT_LANG];
+  return entries[0][1];
+}
+
 module.exports = {
   t,
+  localize,
   setLang,
   getLang,
   resolveLang,

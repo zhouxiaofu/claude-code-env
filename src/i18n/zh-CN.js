@@ -112,6 +112,32 @@ module.exports = {
   'update.skipped': '已跳过 v{version} —— 出现更新的版本时会再次提示。',
   'update.autoDone': 'cce 已在后台更新到 v{version}。',
 
+  // add (create env from template)
+  'add.pickTitle': '选择一个模板：',
+  'add.conflictTitle': '已存在名为 "{name}" 的 env，怎么办？',
+  'add.choiceOverwrite': '覆盖现有的 env',
+  'add.choiceRename': '都保留 —— 给新的换个名字',
+  'add.enterName': '给这个 env 起个名字',
+  'add.invalidName': '无效的 env 名 "{name}"。首字符为字母/数字，其余可用字母、数字、. _ -',
+  'add.nameExists': '已存在名为 "{name}" 的 env（请换个名字，或在交互模式下选择如何处理）。',
+  'add.fieldRequired': '{name} 为必填项 —— 请输入一个值。',
+  'add.created': '已创建 env "{name}"。',
+  'add.setDefaultPrompt': '把 "{name}" 设为默认 env 吗？[y/N]',
+  'add.launchHint': '用 `cce -e {name}` 启动它（用 `cce show {name}` 查看）。',
+  'add.templateNotFound': '找不到模板 "{name}"。可用：{available}',
+  'add.noTemplates': '没有可用的模板。可在 {file} 里添加，或用 --templates <路径> 指定。',
+  'add.needTemplateArg': '选择模板需要 TTY。请直接给出模板名：`cce add <模板>`（用 `cce add --list` 查看）。',
+  'add.needInteractiveFill': '该模板有需要填写的字段，需要 TTY。请用 `cce add` 交互式运行。',
+  'add.templatesNeedsPath': '--templates 需要一个文件路径',
+  'add.unknownOption': '`cce add` 不认识的选项：{tok}',
+  'add.fileParseFailed': '无法解析模板文件 {file}：{message}',
+  'add.fileNotFound': '找不到模板文件：{file}',
+  'add.fileBadShape': '模板文件 {file} 必须是以模板名为 key 的 JSON 对象。',
+  'add.listTitle': '可用的模板：',
+  'add.listSource': '来自：{file}',
+  'add.listFields': '待填字段：{names}',
+  'add.noTemplatesList': '没有可用的模板。',
+
   // config
   'config.readFailed': '读取配置失败 {file}：{message}',
   'config.invalidJson':

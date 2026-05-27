@@ -22,6 +22,7 @@ quick introduction and install instructions, see the [README](../README.en.md).
 - [Command reference](#command-reference)
   - [Launch mode](#launch-mode)
   - [Subcommands](#subcommands)
+- [Create an env from a template](#create-an-env-from-a-template)
 - [Configuration file](#configuration-file)
   - [Location](#location)
   - [Full schema](#full-schema)
@@ -100,6 +101,7 @@ cce -e kimi -m cce                               # merge env with settings.json,
 | Command | Description |
 |---|---|
 | `list`, `ls` | List all envs; `*` marks the current default. |
+| `add [tpl] [name]` | **Create an env from a template** (interactively pick a template and fill in fields). `--list` just lists available templates; `--templates <path>` mounts an external template file. See [Create an env from a template](#create-an-env-from-a-template). |
 | `show <name>` | Show an env's variables, its resolved settings mode, and the merged claude args (with per-layer source labels). API tokens are masked. |
 | `edit` | Open `config.json` in `$EDITOR` (Windows default: notepad). The canonical way to add/edit/remove envs by hand. |
 | `use <name>` | Set the default env. `cce use --none` clears it. |
@@ -110,10 +112,106 @@ cce -e kimi -m cce                               # merge env with settings.json,
 | `update [--check]` | Update cce itself to the latest npm version. Add `--check` to report only, without installing. See [Updating cce](#updating-cce). |
 | `help` | Show help. |
 
-> There is intentionally **no** `cce add` / `cce remove`. Adding, editing, and
-> deleting envs all go through `cce edit`, which opens the JSON directly. The
-> file carries a `$schema` reference, so editors give you completion and
-> validation.
+> `cce add` does exactly one thing: **quickly scaffold an env from a template**.
+> For bulk add/edit/delete or fine-grained hand-editing, `cce edit` opens the JSON
+> directly (the file carries a `$schema` reference, so editors give you completion
+> and validation). There is intentionally **no** `cce remove`: deleting an env is
+> just removing its block in `cce edit`.
+
+---
+
+## Create an env from a template
+
+`cce add` scaffolds an env from a **template**: the fixed parts (base URL, model,
+etc.) are pre-filled, you supply only the few fields that are yours (usually an
+API key), and it writes the whole thing into `config.json`.
+
+```bash
+cce add                          # pick a template → fill fields → name it → write
+cce add deepseek                 # use the "deepseek" template directly, skip the menu
+cce add deepseek ds              # also preset the new env's name to "ds"
+cce add --list                   # just list available templates (name/description/source), no creation
+cce add --templates ./team.json  # mount an extra external template file for this run (see below)
+```
+
+**A run goes roughly like this:**
+
+1. **Pick a template** — with no template name, an arrow-key menu opens; with a
+   name (`cce add deepseek`) it's used directly.
+2. **Fill the fields** — each field the template marks as required is prompted in
+   turn (e.g. `ANTHROPIC_AUTH_TOKEN`). A field with a default accepts it on Enter;
+   one without a default re-prompts on empty input (it is, after all, required).
+   This step is skipped when the template has no fields to fill.
+3. **Name it + dedupe** — name the env (defaults to the template name, Enter to
+   accept). The name must match `[A-Za-z0-9][A-Za-z0-9._-]*`. **If the name already
+   exists**, you choose: **overwrite the existing one**, or **give the new one a
+   different name**.
+4. **Write** — the template's fixed entries plus your filled fields merge into the
+   `env` written to `config.json`, and you're asked whether to set it as the default.
+
+> Picking and filling both need a **TTY** (a human at a terminal). In scripts/pipes,
+> pass everything up front — `cce add <template> <name>` — with a template that has
+> no fields to fill; otherwise cce tells you it needs a TTY rather than hanging.
+
+### Where templates come from
+
+`cce add` resolves templates by layering the sources below, where a **later source
+overrides an earlier one by template name**:
+
+```
+Built-in templates (shipped with cce)
+  └─ overridden by → ~/.claude/cce/templates.json   (your own templates, optional)
+        └─ overridden by → the file from cce add --templates <path>  (this run only)
+```
+
+- **Built-in**: DeepSeek, Kimi, and GLM ship with the package, usable out of the box.
+- **User file**: drop a `templates.json` in the config dir (next to `config.json`)
+  to add your own templates, or override a built-in one by reusing its key.
+- **`--templates <path>`**: affects this run only — handy for trying a template
+  file someone sent you. It **only swaps the template source**; the rest of the
+  flow (pick → fill → name → write, and `--list`) runs exactly the same.
+
+### Template file format
+
+A template file is a JSON object whose **keys are the template names**. Each template:
+
+```jsonc
+{
+  "deepseek": {
+    // description can be a per-language object (shown in your current UI language),
+    // or just a plain string.
+    "description": { "en": "DeepSeek (Claude-compatible API)", "zh-CN": "DeepSeek（兼容 Claude 接口）" },
+
+    // Fixed entries: copied straight into the new env's `env`, no input needed.
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+      "ANTHROPIC_MODEL":    "deepseek-chat"
+    },
+
+    // Required entries: prompted at creation time, then merged into the env above.
+    "required": [
+      {
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": { "en": "Your DeepSeek API Key", "zh-CN": "你的 DeepSeek API Key" },
+        "default": ""    // optional; accepted on Enter when present
+      }
+    ]
+  }
+}
+```
+
+| Field | Description |
+|---|---|
+| `description` | Template description. **Either a string or a per-language object** (e.g. `{ "en": ..., "zh-CN": ... }`). Resolved to the current UI language: current lang → fall back to `en` → fall back to the first non-empty value; nothing shown if all empty. |
+| `env` | The **pre-filled** environment variables (base URL, model, etc.); copied into the new env verbatim. Values must be strings. |
+| `required` | An array of fields the **user must fill in**. Each entry's `name` is the env key to write; the user's input is the value. |
+| `required[].name` | The env key this field fills (e.g. `ANTHROPIC_AUTH_TOKEN`). |
+| `required[].description` | The prompt text for this field; also a per-language object or a string. |
+| `required[].default` | Optional default value; accepted on Enter at fill time. |
+
+> A template's multi-language `description` is **collapsed to a single string in
+> the current UI language** when the env is created, and stored in that env's
+> `description` field (env descriptions in config.json are single strings).
 
 ---
 

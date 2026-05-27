@@ -22,6 +22,7 @@
 - [命令参考](#命令参考)
   - [启动模式](#启动模式)
   - [子命令](#子命令)
+- [从模板创建 env](#从模板创建-env)
 - [配置文件](#配置文件)
   - [位置](#位置)
   - [完整 schema](#完整-schema)
@@ -115,6 +116,7 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 | 命令 | 说明 |
 |---|---|
 | `list`、`ls` | 列出所有 env；`*` 标记当前默认项。 |
+| `add [模板] [名称]` | **从模板创建一个 env**（交互式选模板、填字段）。`--list` 只列出可用模板，`--templates <路径>` 挂载外部模板文件。详见 [从模板创建 env](#从模板创建-env)。 |
 | `show <name>` | 显示某 env 的变量、解析后的合并模式、以及合并后的 claude 参数（带每层来源标注）。API token 自动脱敏。 |
 | `edit` | 用 `$EDITOR`（Windows 默认 notepad）打开 `config.json`。手动增/改/删 env 的标准方式。 |
 | `use <name>` | 设置默认 env。`cce use --none` 清除默认。 |
@@ -125,8 +127,92 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 | `update [--check]` | 把 cce 自己升级到 npm 上的最新版。加 `--check` 只检查、不安装。详见 [更新 cce](#更新-cce)。 |
 | `help` | 显示帮助。 |
 
-> 这里**故意不提供** `cce add` / `cce remove`。增、改、删 env 都走 `cce edit`，直接打开 JSON。
-> 配置文件带 `$schema` 引用，所以编辑器会给你补全和校验。
+> `cce add` 专做「**照模板快速生成**一套 env」这件事。要批量增/改/删、或精细手改，仍然直接
+> `cce edit` 打开 JSON 最顺手（文件带 `$schema` 引用，编辑器会补全和校验）。本工具刻意**没有**
+> `cce remove`：删一个 env 就是在 `cce edit` 里删掉对应的一段。
+
+---
+
+## 从模板创建 env
+
+`cce add` 让你照着一份**模板**快速生成一套 env：模板里固定的部分（接口地址、模型等）已经填好，
+你只需要补上自己的几项（通常就是 API Key），它就把整套写进 `config.json`。
+
+```bash
+cce add                          # 弹出模板菜单 → 逐项填写 → 起名 → 写入
+cce add deepseek                 # 直接用名为 deepseek 的模板，跳过选择菜单
+cce add deepseek ds              # 再省一步：预设新 env 的名字为 ds
+cce add --list                   # 只列出能用的模板（名称/描述/来自哪个文件），不创建
+cce add --templates ./team.json  # 本次额外挂载一个外部模板文件（见下）
+```
+
+**一次创建大致是这样：**
+
+1. **选模板** —— 不带模板名时弹出方向键菜单；带了名字（`cce add deepseek`）就直接用。
+2. **填字段** —— 模板里列为「待填」的项逐个提示你输入（比如 `ANTHROPIC_AUTH_TOKEN`）。
+   有默认值的项，直接回车即接受；没默认值又留空会重新问你（因为是必填）。模板没有待填项时跳过这步。
+3. **起名 + 查重** —— 给这套 env 起个名字（默认就用模板名，回车接受）。名字需符合
+   `[A-Za-z0-9][A-Za-z0-9._-]*`。**若名字已存在**，会让你二选一：**覆盖现有**，或**给新的换个名字**。
+4. **写入** —— 把模板固定项 + 你填的项合并成 `env` 写进 `config.json`，并问你是否设为默认。
+
+> 交互式选择和填写都需要 **TTY**（真人在终端里操作）。在脚本/管道里，请直接给全参数
+> `cce add <模板> <名称>`，且该模板没有待填项；否则 cce 会提示需要 TTY 而不会卡住。
+
+### 模板从哪来
+
+`cce add` 解析模板时按下面的顺序叠加，**后面的同名模板覆盖前面的**：
+
+```
+内置模板（随 cce 一起发布）
+  └─ 被覆盖 → ~/.claude/cce/templates.json （你自己的模板，可选）
+        └─ 被覆盖 → cce add --templates <路径> 指定的文件（仅本次）
+```
+
+- **内置**：随包自带 DeepSeek、Kimi、GLM 几个常用模板，开箱即用。
+- **用户文件**：在配置目录放一个 `templates.json`（与 `config.json` 同级），就能增加你自己的模板，
+  或用同名 key 覆盖内置的。
+- **`--templates <路径>`**：只影响这一次运行，适合临时试用别人发来的模板文件。它**只是换个模板来源**，
+  其余流程（选→填→命名→写入、以及 `--list`）都照常。
+
+### 模板文件格式
+
+模板文件是一个 JSON 对象，**key 就是模板名**，每个模板：
+
+```jsonc
+{
+  "deepseek": {
+    // 描述可以是多语言对象，按你当前的界面语言显示；也可以直接写一个字符串。
+    "description": { "en": "DeepSeek (Claude-compatible API)", "zh-CN": "DeepSeek（兼容 Claude 接口）" },
+
+    // 固定项：直接照搬进新 env 的 env，无需用户填。
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+      "ANTHROPIC_MODEL":    "deepseek-chat"
+    },
+
+    // 待填项：创建时逐个提示用户输入，填好后并入上面的 env。
+    "required": [
+      {
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": { "en": "Your DeepSeek API Key", "zh-CN": "你的 DeepSeek API Key" },
+        "default": ""    // 可选；有默认值时回车即接受
+      }
+    ]
+  }
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `description` | 模板描述。**可以是字符串，也可以是按语言分 key 的对象**（如 `{ "en": ..., "zh-CN": ... }`）。显示时按当前界面语言取：取不到当前语言 → 退回 `en` → 再退回第一个非空值；都没有就不显示。 |
+| `env` | 模板里**已填好**的环境变量（接口地址、模型等），原样进入新 env。值必须是字符串。 |
+| `required` | **需要用户填写**的项的数组。每项的 `name` 就是要写进 `env` 的键名，用户输入的就是值。 |
+| `required[].name` | 待填项对应的 env 键名（如 `ANTHROPIC_AUTH_TOKEN`）。 |
+| `required[].description` | 该项的提示说明，同样支持多语言对象或字符串。 |
+| `required[].default` | 可选默认值；填写时回车即接受。 |
+
+> 模板的多语言 `description` 在生成 env 时会**按当前界面语言塌缩成一句**，存进该 env 的
+> `description` 字段（config.json 里 env 的描述是单一字符串）。
 
 ---
 

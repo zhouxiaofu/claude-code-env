@@ -16,6 +16,7 @@ function toMergeMode(val) {
 
 const SUBCOMMANDS = new Set([
   'list', 'ls',
+  'add',
   'show',
   'edit',
   'use',

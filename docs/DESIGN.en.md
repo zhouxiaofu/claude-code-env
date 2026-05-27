@@ -131,6 +131,7 @@ once.
 | Command | What it does |
 |---|---|
 | `cce list` / `cce ls` | List all envs (with `*` marking the default) |
+| `cce add [tpl] [name]` | Create an env from a template (interactively pick + fill fields); `--list` lists templates, `--templates <path>` mounts an external template file — see §15 |
 | `cce show <name>` | Show an env's details (API keys auto-masked, e.g. `sk-***abcd`) |
 | `cce edit` | Open config.json in `$EDITOR` (Windows default: notepad) — **the only add/edit/remove env path in v0.1** |
 | `cce use <name>` | Set the default env (used by bare `cce`) |
@@ -146,6 +147,11 @@ once.
 > ship what works; skip the interactive prompt code to keep dependencies minimal
 > and bug surface small. Developers are fine editing JSON (the schema is simple
 > and editors provide completion/validation via the `$schema` field).
+>
+> **Later update**: `cce add` was added in a later version, but scoped narrowly to
+> "**quickly scaffold an env from a template**" (not a general add/remove wizard);
+> see §15 for the design. `cce remove` is still not provided — deleting an env is
+> just removing a block in `cce edit`.
 
 ### 4.3 Parser strategy
 
@@ -809,3 +815,68 @@ their lifetime is the claude process lifetime and they never touch real config
 New CLI: `-m/--merge-mode <override|cce|claude>` (launch modifier),
 `cce lang [en|zh-CN|auto]` (subcommand). The new env read point respects
 `CLAUDE_CONFIG_DIR` (consistent with claude).
+
+---
+
+## 15. Create an env from a template (`cce add`)
+
+The `cce add` deferred in §11.3 was reintroduced, but does **exactly one thing**:
+take a template, keep its fixed parts pre-filled, prompt the user for a few fields
+(usually a token), and write a finished env into `config.json`. The core lives in
+`src/templates.js` (load/merge) + `src/commands/add.js` (orchestration) +
+`src/util/prompt.js` (text input).
+
+### 15.1 Key decisions
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Command name | `cce add` (optional `[template] [name]`) | User's call; reads plainly and matches `use`/`edit`/`pick` |
+| Scope | **Template scaffolding only**, not a general add/remove wizard | Narrowed to the real pain point — newcomers wiring up DeepSeek/Kimi/GLM. Arbitrary edits stay in `cce edit`; no `cce remove` |
+| **No placeholders** | A template's `env` holds fixed values; a separate `required` array lists fields to fill, where each `name` is the env key and the user's input is the value, merged into `env` after filling | Avoids clashing with the runtime `${VAR}` semantics (resolved from the shell at launch, §13.1) — an earlier `{{TOKEN}}` idea would collide with it, so no placeholders at all |
+| Required-field shape | `{ name, description, default? }`; empty input takes the default if present, else re-prompts | `required` = mandatory; `default` lets fields like a model name be accepted with Enter |
+| Name validation | Reuses the schema rule `^[A-Za-z0-9][A-Za-z0-9._-]*$` (`config.isValidEnvName`) | Matches the `envs` `patternProperties`, so names from `cce add` always pass the schema |
+| Collision handling | A two-option picker: overwrite existing / rename; re-checks after rename, looping | No silent overwrite; a non-TTY collision errors out |
+| Interactivity gate | Picking / filling / the two-option choice all need a TTY (`stdin && stdout`) | With full args and a no-field template, a pure non-interactive create works; otherwise it reports needing a TTY rather than hanging |
+
+### 15.2 Template sources & resolution chain
+
+A later source **replaces an earlier same-named entry wholesale** (no deep merge —
+predictable):
+
+```
+Built-in src/templates.builtin.json
+  └─ ~/.claude/cce/templates.json        (user file, optional)
+       └─ cce add --templates <path>      (this run only)
+```
+
+- Built-ins ship with the package (`files` already includes `src/`, no extra
+  config); currently DeepSeek, Kimi, GLM.
+- A `--templates` path that's missing / invalid JSON → error (`TemplateError`); an
+  absent user file is silently skipped.
+- After several rounds, **only `--templates` is kept** as the external entry point
+  (env var, config field, and a templates directory were all dropped) to keep the
+  surface minimal.
+
+### 15.3 Multi-language description (i18n integration)
+
+Both a template's `description` and each `required[].description` may be a
+per-language object like `{ "en": …, "zh-CN": … }` (a plain string still works).
+A new `i18n.localize(value)` resolves it: current lang → fall back to `en` → fall
+back to the first non-empty value; `null` / empty object / no non-empty value →
+`''` (rendered as nothing). When the env is created, the template's multi-language
+description is **collapsed to a single current-language string** and stored in that
+env's single-string `description`.
+
+### 15.4 What was added / changed
+
+- New `src/templates.builtin.json`, `src/templates.js` (incl. the pure
+  `buildEnvFromTemplate(tpl, answers)` for testability), `src/commands/add.js`,
+  `src/util/prompt.js`.
+- `src/i18n/index.js` exports `localize`; `src/config.js` adds `ENV_NAME_RE` /
+  `isValidEnvName`.
+- `parser.js` / `cli.js` register `add`; `help.js`, `completion.js` (template-name
+  completion + `--list`/`--templates`, plus an internal `completion --templates`
+  emitter), and `en.js`/`zh-CN.js` (new `add.*` keys) follow.
+- Tests in `test/templates.test.js`: `localize` fallbacks, template normalization,
+  `buildEnvFromTemplate`, source-override merge, missing-file / bad-JSON errors,
+  name validation.

@@ -57,6 +57,7 @@ async function run(argv) {
 async function runSubcommand(name, args) {
   switch (name) {
     case 'list':       return require('./commands/list').run(args);
+    case 'add':        return await require('./commands/add').run(args);
     case 'show':       return require('./commands/show').run(args);
     case 'edit':       return require('./commands/edit').run(args);
     case 'use':        return require('./commands/use').run(args);

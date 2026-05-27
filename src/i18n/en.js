@@ -113,6 +113,32 @@ module.exports = {
   'update.skipped': 'Skipping v{version} — you will be reminded when a newer version ships.',
   'update.autoDone': 'cce was updated to v{version} in the background.',
 
+  // add (create env from template)
+  'add.pickTitle': 'Pick a template:',
+  'add.conflictTitle': 'An env named "{name}" already exists. What now?',
+  'add.choiceOverwrite': 'Overwrite the existing env',
+  'add.choiceRename': 'Keep both — name the new one differently',
+  'add.enterName': 'Name for this env',
+  'add.invalidName': 'Invalid env name "{name}". Use letters/digits to start, then letters, digits, . _ -',
+  'add.nameExists': 'An env named "{name}" already exists (pass a different name, or run interactively to choose).',
+  'add.fieldRequired': '{name} is required — please enter a value.',
+  'add.created': 'Created env "{name}".',
+  'add.setDefaultPrompt': 'Set "{name}" as the default env? [y/N]',
+  'add.launchHint': 'Launch it with `cce -e {name}`  (inspect with `cce show {name}`).',
+  'add.templateNotFound': 'Template "{name}" not found. Available: {available}',
+  'add.noTemplates': 'No templates available. Add your own in {file}, or pass --templates <path>.',
+  'add.needTemplateArg': 'Picking a template needs a TTY. Pass a template name: `cce add <template>` (see `cce add --list`).',
+  'add.needInteractiveFill': 'This template has fields to fill in, which needs a TTY. Run `cce add` interactively.',
+  'add.templatesNeedsPath': '--templates requires a file path',
+  'add.unknownOption': 'Unknown option for `cce add`: {tok}',
+  'add.fileParseFailed': 'Could not parse template file {file}: {message}',
+  'add.fileNotFound': 'Template file not found: {file}',
+  'add.fileBadShape': 'Template file {file} must be a JSON object keyed by template name.',
+  'add.listTitle': 'Available templates:',
+  'add.listSource': 'from: {file}',
+  'add.listFields': 'fields: {names}',
+  'add.noTemplatesList': 'No templates available.',
+
   // config
   'config.readFailed': 'Failed to read config at {file}: {message}',
   'config.invalidJson':

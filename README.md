@@ -42,6 +42,7 @@ cce -e kimi -m cce       # 与 ~/.claude/settings.json 合并，冲突时 kimi �
 ## 功能特性
 
 - 🚀 **一行命令** —— 用某套 env（启动配置）拉起 `claude`，一步到位。
+- 🧩 **模板快速接入** —— `cce add` 从内置模板（DeepSeek、Kimi、GLM）选一个，填上你的 API Key 即生成一套 env；也能用自己的模板文件（见[从模板创建 env](docs/usage.md#从模板创建-env)）。
 - 🪟 **每个进程独立** —— 不同窗口可同时用不同 env（不同服务商，或同一服务商的不同配置）；你命令行环境里的变量一字不动。
 - ⚙️ **默认参数管理** —— 常用的 claude 启动参数（如 `--permission-mode bypassPermissions`）存进配置，可全局、也可按某个 env 单独设；`-a` 在此基础上追加、`-A` 整组覆盖。
 - 🔀 **与 settings.json 合并** —— 三种模式（`override` / `cce` / `claude`）决定你的配置如何与 Claude Code 自己的 `~/.claude/settings.json` 合并。cce **从不改写**那个文件，而是另写一份临时文件、用 `claude --settings` 启动。
@@ -72,7 +73,9 @@ npm install -g @xiaofuzhou/cce
 ## 快速开始
 
 ```bash
-# 1. 打开配置文件，添加你的服务商（首次运行 cce 会自动写入一份带示例的起始文件）
+# 1. 从内置模板快速生成一套 env（选 deepseek/kimi/glm，填入你的 API Key 即可）
+cce add
+#    —— 或者打开配置文件手动添加（首次运行 cce 会自动写入一份带示例的起始文件）
 cce edit
 
 # 2. 看看配置了哪些（* 号标记的是默认项）

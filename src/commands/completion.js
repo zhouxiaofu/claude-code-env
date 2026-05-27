@@ -18,6 +18,16 @@ function run(args) {
     return 0;
   }
 
+  if (args[0] === '--templates' || args[0] === '__templates__') {
+    try {
+      const names = [...require('../templates').loadTemplates().keys()].sort();
+      process.stdout.write(names.join('\n') + '\n');
+    } catch {
+      /* ignore — completion must never error */
+    }
+    return 0;
+  }
+
   const shell = (args[0] || '').toLowerCase();
   switch (shell) {
     case 'bash':
@@ -44,7 +54,7 @@ function run(args) {
   }
 }
 
-const SUB = ['list', 'ls', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'update', 'help'];
+const SUB = ['list', 'ls', 'add', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'update', 'help'];
 const TOP_FLAGS = ['-e', '--env', '-a', '-A', '-m', '--merge-mode', '-h', '--help', '-v', '--version'];
 const MERGE_MODES = ['override', 'cce', 'claude'];
 const LANGS = ['en', 'zh-CN', 'auto'];
@@ -67,6 +77,12 @@ _cce_completion() {
       ;;
     completion)
       COMPREPLY=( $(compgen -W "bash zsh powershell fish" -- "$cur") )
+      return 0
+      ;;
+    add)
+      local tpls
+      tpls="$(cce completion --templates 2>/dev/null)"
+      COMPREPLY=( $(compgen -W "$tpls --list --templates" -- "$cur") )
       return 0
       ;;
     update)
@@ -115,6 +131,12 @@ _cce() {
       compadd -- bash zsh powershell fish
       return
       ;;
+    add)
+      local tpls
+      tpls=($(cce completion --templates 2>/dev/null))
+      compadd -- $tpls --list --templates
+      return
+      ;;
     update)
       compadd -- --check
       return
@@ -145,8 +167,12 @@ function __cce_envs
   cce completion --envs 2>/dev/null
 end
 
+function __cce_templates
+  cce completion --templates 2>/dev/null
+end
+
 # Subcommands (only when no subcommand has been typed yet)
-complete -c cce -n '__fish_use_subcommand' -a 'list ls show edit use current lang pick completion update help'
+complete -c cce -n '__fish_use_subcommand' -a 'list ls add show edit use current lang pick completion update help'
 complete -c cce -n '__fish_use_subcommand' -s e -l env -a '(__cce_envs)' -d 'Use an env'
 complete -c cce -n '__fish_use_subcommand' -s a -d 'Merge claude args'
 complete -c cce -n '__fish_use_subcommand' -s A -d 'Override claude args'
@@ -160,6 +186,7 @@ end
 complete -c cce -n '__fish_seen_subcommand_from completion' -a 'bash zsh powershell fish'
 complete -c cce -n '__fish_seen_subcommand_from lang' -a 'en zh-CN auto'
 complete -c cce -n '__fish_seen_subcommand_from update' -a '--check'
+complete -c cce -n '__fish_seen_subcommand_from add' -a '(__cce_templates) --list --templates'
 
 # -e/--env arg completion at any position before pass-through
 complete -c cce -s e -l env -a '(__cce_envs)' -d 'Use an env'
@@ -184,7 +211,13 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
         } catch { @() }
     }
 
-    $subcommands = @('list','ls','show','edit','use','current','lang','pick','completion','update','help')
+    function _Templates {
+        try {
+            (& cce completion --templates 2>$null) -split "\`r?\`n" | Where-Object { $_ }
+        } catch { @() }
+    }
+
+    $subcommands = @('list','ls','add','show','edit','use','current','lang','pick','completion','update','help')
     $flags       = @('-e','--env','-m','--merge-mode','-h','--help','-v','--version')
 
     # Complete env names after these tokens
@@ -214,6 +247,12 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
 
     if ($prev -eq 'update') {
         @('--check') | Where-Object { $_ -like "$wordToComplete*" } |
+            ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+        return
+    }
+
+    if ($prev -eq 'add') {
+        (_Templates) + @('--list','--templates') | Where-Object { $_ -like "$wordToComplete*" } |
             ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
         return
     }

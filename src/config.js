@@ -30,6 +30,15 @@ const DEFAULT_SETTINGS_MODE = 'override';
 const UPDATE_MODES = ['auto', 'prompt', 'off'];
 const DEFAULT_UPDATE_MODE = 'auto';
 
+// Allowed env names — mirrors the `envs` patternProperties in schema.json so a
+// name created by `cce add` always validates against the schema too: first char
+// alphanumeric, rest may add . _ -
+const ENV_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+function isValidEnvName(name) {
+  return typeof name === 'string' && ENV_NAME_RE.test(name);
+}
+
 function getConfigDir() {
   if (process.env.CCE_CONFIG_HOME) {
     return path.resolve(process.env.CCE_CONFIG_HOME);
@@ -219,6 +228,8 @@ module.exports = {
   DEFAULT_SETTINGS_MODE,
   UPDATE_MODES,
   DEFAULT_UPDATE_MODE,
+  ENV_NAME_RE,
+  isValidEnvName,
   getConfigDir,
   getConfigPath,
   getClaudeDir,

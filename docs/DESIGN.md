@@ -114,6 +114,7 @@ cce -e deepseek -A                               # 完全无 args，裸 claude
 | 命令 | 作用 |
 |---|---|
 | `cce list` / `cce ls` | 列出所有 env（带 ✓ 标记当前默认） |
+| `cce add [模板] [名称]` | 从模板创建 env（交互式选模板 + 填字段）；`--list` 列模板，`--templates <路径>` 挂外部模板文件 —— 见 §15 |
 | `cce show <name>` | 显示某 env 的详情（API key 自动脱敏，例如 `sk-***abcd`） |
 | `cce edit` | 用 `$EDITOR`（Windows 默认 notepad）打开 config.json —— **v0.1 唯一的"增/改/删 env"路径** |
 | `cce use <name>` | 把某 env 设为默认（裸 `cce` 时使用） |
@@ -127,6 +128,8 @@ cce -e deepseek -A                               # 完全无 args，裸 claude
 | `cce --version` / `cce -v` | 版本号 |
 
 > **v0.1 不内置 `cce add` / `cce remove`**：增/改/删 env 统一走 `cce edit` 直接改 JSON。交互式 add（厂商模板向导）和 remove（带确认）推迟到 v0.2。理由：能用就先发，把交互式 prompt 那块代码省了，依赖最小、bug 面最小；用户编辑 JSON 也并不痛苦（schema 简单、有 `$schema` 字段给编辑器做补全和校验）。
+>
+> **后续更新**：`cce add` 已在后续版本加入，但定位收窄为「**照模板快速生成一套 env**」（而非通用的增删 env 向导），设计见 §15。`cce remove` 仍不做 —— 删 env 就是在 `cce edit` 里删一段。
 
 ### 4.3 解析策略
 
@@ -732,3 +735,46 @@ cce 发布在 npm（`@xiaofuzhou/cce`），所谓「更新」本质就是**查 n
 ```
 
 新增子命令 `cce update [--check]`；新增环境变量 `CCE_NO_UPDATE_CHECK`；新增状态文件 `~/.claude/cce/update-check.json`。i18n 新增 `update.*` 键（en/zh 各一套），help / completion 同步。
+
+---
+
+## 15. 模板创建 env（`cce add`）
+
+把 §11.3 推迟的 `cce add` 重新引入，但**只做一件事**：照一份模板，把固定部分填好、提示用户补上几项（通常是 token），生成一套 env 写进 `config.json`。核心在 `src/templates.js`（加载/合并）+ `src/commands/add.js`（编排）+ `src/util/prompt.js`（文本输入）。
+
+### 15.1 关键取舍
+
+| 决策 | 选择 | 理由 |
+|---|---|---|
+| 命令名 | `cce add`（可带 `[模板] [名称]`） | 用户拍板；语义直白，和 `use`/`edit`/`pick` 等子命令一致 |
+| 定位 | **只做模板快速生成**，不做通用增删向导 | 把范围收窄到「新手快速接入 DeepSeek/Kimi/GLM」这个真实痛点；任意增删仍走 `cce edit`，`cce remove` 不做 |
+| **不用占位符** | 模板的 `env` 全是填好的固定值；另有 `required` 数组列「待填项」，每项 `name` 即 env 键、用户输入即值，填完直接并入 `env` | 避开与运行时 `${VAR}`（启动时从 shell 解析，见 §13.1）的语义冲突 —— 早期设想的 `{{TOKEN}}` 占位符会和它打架，索性不引入占位符 |
+| 待填项字段 | `{ name, description, default? }`；空值有 default 则取 default，无 default 则重问 | `required` 语义＝必填；`default` 让「模型名」这类项能回车接受 |
+| 名字校验 | 沿用 schema 的 `^[A-Za-z0-9][A-Za-z0-9._-]*$`（`config.isValidEnvName`） | 与 `envs` 的 `patternProperties` 一致，保证 `cce add` 产出的名字也过 schema |
+| 重名处理 | 弹二选一 picker：覆盖现有 / 重命名；重命名后再查重，循环 | 不静默覆盖；非 TTY 冲突直接报错退出 |
+| 交互门控 | 选模板 / 填字段 / 二选一都需 TTY（`stdin && stdout` 均为 TTY） | 无 TTY 时给全参数且模板无待填项即可纯非交互创建，否则提示需 TTY，绝不卡死 |
+
+### 15.2 模板来源与解析链
+
+后者按模板名**整条覆盖**前者（不深合并，行为可预期）：
+
+```
+内置 src/templates.builtin.json
+  └─ ~/.claude/cce/templates.json        （用户文件，可选）
+       └─ cce add --templates <path>      （仅本次）
+```
+
+- 内置随包发布（`files` 已含 `src/`，无需额外配置）；目前含 DeepSeek、Kimi、GLM。
+- `--templates` 给的路径找不到 / JSON 非法 → 报错（`TemplateError`）；用户文件不存在则静默跳过。
+- 经多轮收敛，**只保留 `--templates` 这一个外部入口**（放弃了环境变量、config 字段、模板目录等方案），保持最小面。
+
+### 15.3 多语言 description（联动 i18n）
+
+模板的 `description` 与 `required[].description` 都可以是 `{ "en": …, "zh-CN": … }` 这样的按语言对象（也兼容纯字符串）。新增 `i18n.localize(value)`：当前语言 → 回退 `en` → 回退第一个非空值；`null`/空对象/无非空值 → `''`（界面不显示）。生成 env 时，模板的多语言描述用 `localize` **塌缩成当前语言一句**存进该 env 的单字符串 `description`。
+
+### 15.4 新增 / 改动
+
+- 新增 `src/templates.builtin.json`、`src/templates.js`（含纯函数 `buildEnvFromTemplate(tpl, answers)` 便于测试）、`src/commands/add.js`、`src/util/prompt.js`。
+- `src/i18n/index.js` 导出 `localize`；`src/config.js` 加 `ENV_NAME_RE` / `isValidEnvName`。
+- `parser.js` / `cli.js` 注册 `add`；`help.js`、`completion.js`（补模板名 + `--list`/`--templates`，新增内部 `completion --templates` 发射器）、`en.js`/`zh-CN.js`（新增 `add.*` 键）同步。
+- 测试 `test/templates.test.js`：`localize` 回退、模板规范化、`buildEnvFromTemplate`、来源覆盖合并、缺文件 / 坏 JSON 报错、名字校验。

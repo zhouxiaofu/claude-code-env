@@ -1,0 +1,70 @@
+{
+  "deepseek": {
+    "description": {
+      "en": "DeepSeek (Claude-compatible API)",
+      "zh-CN": "DeepSeek（兼容 Claude 接口）"
+    },
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+      "ANTHROPIC_MODEL": "deepseek-v4-pro",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-pro",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash",
+      "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-v4-flash",
+      "CLAUDE_CODE_EFFORT_LEVEL": "max"
+    },
+    "required": [
+      {
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": {
+          "en": "Your DeepSeek API Key (from platform.deepseek.com)",
+          "zh-CN": "你的 DeepSeek API Key（platform.deepseek.com 获取）"
+        }
+      }
+    ]
+  },
+  "kimi": {
+    "description": {
+      "en": "Moonshot Kimi K2.5 (Claude-compatible API)",
+      "zh-CN": "月之暗面 Kimi K2.5（兼容 Claude 接口）"
+    },
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://api.moonshot.cn/anthropic",
+      "ANTHROPIC_MODEL": "kimi-k2.5",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "kimi-k2.5",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "kimi-k2.5",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "kimi-k2.5",
+      "CLAUDE_CODE_SUBAGENT_MODEL": "kimi-k2.5",
+      "ENABLE_TOOL_SEARCH": "false"
+    },
+    "required": [
+      {
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": {
+          "en": "Your Moonshot API Key (from platform.moonshot.cn)",
+          "zh-CN": "你的 Moonshot API Key（platform.moonshot.cn 获取）"
+        }
+      }
+    ]
+  },
+  "glm": {
+    "description": {
+      "en": "Zhipu GLM (Claude-compatible API)",
+      "zh-CN": "智谱 GLM（兼容 Claude 接口）"
+    },
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+      "API_TIMEOUT_MS": "3000000",
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+    },
+    "required": [
+      {
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": {
+          "en": "Your Zhipu API Key (from bigmodel.cn)",
+          "zh-CN": "你的智谱 API Key（bigmodel.cn 获取）"
+        }
+      }
+    ]
+  }
+}
