@@ -21,6 +21,11 @@ const REGISTRY_URL = `https://registry.npmjs.org/${PACKAGE_NAME}/latest`;
 // How long a background check result is trusted before we refresh it again.
 const CHECK_INTERVAL_MS = 3 * 60 * 60 * 1000; // 3 hours
 const FETCH_TIMEOUT_MS = 4000;
+// How long to wait before retrying a previously-kicked-off background install
+// for the same target version. The spawn is detached so we never see npm's
+// exit code — if the version doesn't land within this window, we assume the
+// install failed (network, registry, permissions, ...) and try again.
+const AUTO_INSTALL_RETRY_MS = 60 * 60 * 1000; // 1 hour
 
 // ---------------------------------------------------------------------------
 // State file (~/.claude/cce/update-check.json)
@@ -36,6 +41,7 @@ function readState() {
     latestVersion: null,
     skippedVersion: null,
     autoUpdatePending: null,
+    autoUpdateAttemptedAt: 0,
   };
   try {
     const parsed = JSON.parse(fs.readFileSync(getStatePath(), 'utf8'));
@@ -44,6 +50,7 @@ function readState() {
       if (typeof parsed.latestVersion === 'string') base.latestVersion = parsed.latestVersion;
       if (typeof parsed.skippedVersion === 'string') base.skippedVersion = parsed.skippedVersion;
       if (typeof parsed.autoUpdatePending === 'string') base.autoUpdatePending = parsed.autoUpdatePending;
+      if (typeof parsed.autoUpdateAttemptedAt === 'number') base.autoUpdateAttemptedAt = parsed.autoUpdateAttemptedAt;
     }
   } catch {
     /* missing / unreadable / invalid — caller gets fresh defaults */
@@ -209,10 +216,14 @@ function maybeRefreshInBackground(state) {
 function handleAuto(current, state) {
   const pending = pendingUpdate(current, state);
   if (pending) {
-    // A newer version exists. Kick off a silent background install once per
-    // target version (re-launches before it lands shouldn't re-trigger it).
-    if (state.autoUpdatePending !== pending && installLatestDetached()) {
-      writeState({ autoUpdatePending: pending });
+    // A newer version exists. Kick off a silent background install — once per
+    // target version, and again after AUTO_INSTALL_RETRY_MS if it hasn't landed
+    // (we never see npm's exit code, so a stale attempt = assumed failure).
+    const isNewTarget = state.autoUpdatePending !== pending;
+    const retryDue = !isNewTarget &&
+      Date.now() - (state.autoUpdateAttemptedAt || 0) > AUTO_INSTALL_RETRY_MS;
+    if ((isNewTarget || retryDue) && installLatestDetached()) {
+      writeState({ autoUpdatePending: pending, autoUpdateAttemptedAt: Date.now() });
     }
     return;
   }
@@ -220,7 +231,7 @@ function handleAuto(current, state) {
   // at-or-above it, the update landed — announce once and clear the marker.
   if (state.autoUpdatePending && !isNewer(state.autoUpdatePending, current)) {
     log.success(t('update.autoDone', { version: current }));
-    writeState({ autoUpdatePending: null });
+    writeState({ autoUpdatePending: null, autoUpdateAttemptedAt: 0 });
   }
 }
 

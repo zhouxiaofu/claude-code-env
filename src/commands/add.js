@@ -108,8 +108,14 @@ async function run(args) {
   const name = await resolveEnvName(template, opts.envName, cfg);
   if (name === null) return 1; // resolveEnvName already reported why
 
-  // 4) Write it.
-  cfg.envs[name] = { description: localize(template.description), env };
+  // 4) Write it. On overwrite, preserve any non-template fields the user added
+  // by hand (args / argsOverride / settingsMode) — only the template-owned
+  // fields (description + env) are replaced.
+  cfg.envs[name] = {
+    ...(cfg.envs[name] || {}),
+    description: localize(template.description),
+    env,
+  };
   config.save(cfg);
   log.success(t('add.created', { name }));
 

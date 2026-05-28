@@ -53,6 +53,7 @@ test('readState/writeState round-trip via CCE_CONFIG_HOME', () => {
       latestVersion: null,
       skippedVersion: null,
       autoUpdatePending: null,
+      autoUpdateAttemptedAt: 0,
     });
 
     update.writeState({ latestVersion: '9.9.9', skippedVersion: '9.9.9' });

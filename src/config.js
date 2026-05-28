@@ -185,21 +185,6 @@ function listEnvNames(cfg) {
   return Object.keys(cfg.envs).sort();
 }
 
-function setEnv(cfg, name, entry) {
-  cfg.envs[name] = {
-    description: entry.description || '',
-    env: entry.env || {},
-  };
-  return cfg;
-}
-
-function removeEnv(cfg, name) {
-  if (!cfg.envs[name]) return false;
-  delete cfg.envs[name];
-  if (cfg.default === name) cfg.default = null;
-  return true;
-}
-
 function setDefault(cfg, name) {
   if (name == null || name === '') {
     cfg.default = null;
@@ -241,8 +226,6 @@ module.exports = {
   peekLang,
   getEnv,
   listEnvNames,
-  setEnv,
-  removeEnv,
   setDefault,
   resolveSettingsMode,
 };
