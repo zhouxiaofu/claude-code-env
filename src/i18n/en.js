@@ -139,6 +139,17 @@ module.exports = {
   'add.listFields': 'fields: {names}',
   'add.noTemplatesList': 'No templates available.',
 
+  // remove
+  'remove.unknownOption': 'Unknown option for `cce remove`: {tok}',
+  'remove.tooManyArgs': 'Too many arguments. Usage: cce remove [-y] [<name>]',
+  'remove.usage': 'Picking an env to remove needs a TTY. Pass a name: `cce remove <name>`.',
+  'remove.pickTitle': 'Pick an env to remove:',
+  'remove.confirm': 'Remove env "{name}"? [y/N]',
+  'remove.confirmDefault': 'Remove env "{name}" (currently the default)? [y/N]',
+  'remove.needYesNonTTY': '`cce remove` requires -y/--yes in non-interactive mode',
+  'remove.removed': 'Removed env "{name}".',
+  'remove.defaultCleared': 'Default env cleared — bare `cce` will open the picker.',
+
   // config
   'config.readFailed': 'Failed to read config at {file}: {message}',
   'config.invalidJson':

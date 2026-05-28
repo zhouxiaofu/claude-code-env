@@ -17,6 +17,7 @@ function toMergeMode(val) {
 const SUBCOMMANDS = new Set([
   'list', 'ls',
   'add',
+  'remove', 'rm',
   'show',
   'edit',
   'use',
@@ -181,6 +182,7 @@ function parseLaunch(argv) {
 
 function normalizeSubcommand(name) {
   if (name === 'ls') return 'list';
+  if (name === 'rm') return 'remove';
   return name;
 }
 

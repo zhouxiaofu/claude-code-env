@@ -138,6 +138,17 @@ module.exports = {
   'add.listFields': '待填字段：{names}',
   'add.noTemplatesList': '没有可用的模板。',
 
+  // remove
+  'remove.unknownOption': '`cce remove` 不认识的选项：{tok}',
+  'remove.tooManyArgs': '参数过多。用法：cce remove [-y] [<名称>]',
+  'remove.usage': '选择要删除的 env 需要 TTY。请直接给出名称：`cce remove <名称>`。',
+  'remove.pickTitle': '选择要删除的 env：',
+  'remove.confirm': '删除 env "{name}"？[y/N]',
+  'remove.confirmDefault': '删除 env "{name}"（当前默认）？[y/N]',
+  'remove.needYesNonTTY': '`cce remove` 在非交互模式下需要 -y/--yes',
+  'remove.removed': '已删除 env "{name}"。',
+  'remove.defaultCleared': '默认 env 已清除 —— 裸 `cce` 会弹出选择菜单。',
+
   // config
   'config.readFailed': '读取配置失败 {file}：{message}',
   'config.invalidJson':

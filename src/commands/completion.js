@@ -54,7 +54,7 @@ function run(args) {
   }
 }
 
-const SUB = ['list', 'ls', 'add', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'update', 'help'];
+const SUB = ['list', 'ls', 'add', 'remove', 'rm', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'update', 'help'];
 const TOP_FLAGS = ['-e', '--env', '-a', '-A', '-m', '--merge-mode', '-h', '--help', '-v', '--version'];
 const MERGE_MODES = ['override', 'cce', 'claude'];
 const LANGS = ['en', 'zh-CN', 'auto'];
@@ -67,9 +67,9 @@ _cce_completion() {
   cur="\${COMP_WORDS[COMP_CWORD]}"
   prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
-  # Complete env names after -e / --env / 'use' / 'show'
+  # Complete env names after -e / --env / 'use' / 'show' / 'remove' / 'rm'
   case "$prev" in
-    -e|--env|use|show)
+    -e|--env|use|show|remove|rm)
       local envs
       envs="$(cce completion --envs 2>/dev/null)"
       COMPREPLY=( $(compgen -W "$envs" -- "$cur") )
@@ -121,7 +121,7 @@ _cce() {
 
   local prev="\${words[CURRENT-1]}"
   case "$prev" in
-    -e|--env|use|show)
+    -e|--env|use|show|remove|rm)
       local envs
       envs=($(cce completion --envs 2>/dev/null))
       compadd -- $envs
@@ -172,7 +172,7 @@ function __cce_templates
 end
 
 # Subcommands (only when no subcommand has been typed yet)
-complete -c cce -n '__fish_use_subcommand' -a 'list ls add show edit use current lang pick completion update help'
+complete -c cce -n '__fish_use_subcommand' -a 'list ls add remove rm show edit use current lang pick completion update help'
 complete -c cce -n '__fish_use_subcommand' -s e -l env -a '(__cce_envs)' -d 'Use an env'
 complete -c cce -n '__fish_use_subcommand' -s a -d 'Merge claude args'
 complete -c cce -n '__fish_use_subcommand' -s A -d 'Override claude args'
@@ -180,7 +180,7 @@ complete -c cce -n '__fish_use_subcommand' -s h -l help
 complete -c cce -n '__fish_use_subcommand' -s v -l version
 
 # Env name argument for subcommands that take one
-for cmd in use show
+for cmd in use show remove rm
   complete -c cce -n "__fish_seen_subcommand_from $cmd" -a '(__cce_envs)'
 end
 complete -c cce -n '__fish_seen_subcommand_from completion' -a 'bash zsh powershell fish'
@@ -217,11 +217,11 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
         } catch { @() }
     }
 
-    $subcommands = @('list','ls','add','show','edit','use','current','lang','pick','completion','update','help')
+    $subcommands = @('list','ls','add','remove','rm','show','edit','use','current','lang','pick','completion','update','help')
     $flags       = @('-e','--env','-m','--merge-mode','-h','--help','-v','--version')
 
     # Complete env names after these tokens
-    if ($prev -in @('-e','--env','use','show')) {
+    if ($prev -in @('-e','--env','use','show','remove','rm')) {
         _Envs | Where-Object { $_ -like "$wordToComplete*" } |
             ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
         return
