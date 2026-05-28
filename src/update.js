@@ -171,11 +171,15 @@ function installLatestSync() {
 }
 
 // Detached, fully-silent background install. Survives the parent exiting.
+// windowsHide: on Windows, `npm` is `npm.cmd`, so cross-spawn routes through
+// cmd.exe; combined with detached:true that gives the child its own console
+// window. windowsHide:true suppresses it so the auto-update stays invisible.
 function installLatestDetached() {
   try {
     const child = crossSpawn('npm', ['install', '-g', INSTALL_SPEC], {
       stdio: 'ignore',
       detached: true,
+      windowsHide: true,
     });
     child.unref();
     return true;
