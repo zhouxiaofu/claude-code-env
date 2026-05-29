@@ -116,7 +116,9 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 | 命令 | 说明 |
 |---|---|
 | `list`、`ls` | 列出所有 env；`*` 标记当前默认项。 |
-| `add [模板] [名称]` | **从模板创建一个 env**（交互式选模板、填字段）。`--list` 只列出可用模板，`--templates <路径>` 挂载外部模板文件。详见 [从模板创建 env](#从模板创建-env)。 |
+| `add [模板] [名称]` | **从模板创建一个 env**（交互式选模板、填字段）。`--from <路径\|URL>` 本次改用其它模板来源。详见 [从模板创建 env](#从模板创建-env)。 |
+| `remove`、`rm [名称]` | 删除一个 env（会二次确认；`-y` 跳过确认；不带名称则弹出选择菜单）。删的是默认 env 时一并清空默认。 |
+| `template`、`tpl [...]` | 管理模板来源与缓存：`ls`/`list`、`show <名>`、`refresh`、`url`、`offline`。详见 [管理模板（cce template）](#管理模板cce-template)。 |
 | `show <name>` | 显示某 env 的变量、解析后的合并模式、以及合并后的 claude 参数（带每层来源标注）。API token 自动脱敏。 |
 | `edit` | 用 `$EDITOR`（Windows 默认 notepad）打开 `config.json`。手动增/改/删 env 的标准方式。 |
 | `use <name>` | 设置默认 env。`cce use --none` 清除默认。 |
@@ -127,9 +129,8 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 | `update [--check]` | 把 cce 自己升级到 npm 上的最新版。加 `--check` 只检查、不安装。详见 [更新 cce](#更新-cce)。 |
 | `help` | 显示帮助。 |
 
-> `cce add` 专做「**照模板快速生成**一套 env」这件事。要批量增/改/删、或精细手改，仍然直接
-> `cce edit` 打开 JSON 最顺手（文件带 `$schema` 引用，编辑器会补全和校验）。本工具刻意**没有**
-> `cce remove`：删一个 env 就是在 `cce edit` 里删掉对应的一段。
+> `cce add` 专做「**照模板快速生成**一套 env」这件事。要批量增/改、或精细手改，仍然直接
+> `cce edit` 打开 JSON 最顺手（文件带 `$schema` 引用，编辑器会补全和校验）。
 
 ---
 
@@ -142,8 +143,9 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 cce add                          # 弹出模板菜单 → 逐项填写 → 起名 → 写入
 cce add deepseek                 # 直接用名为 deepseek 的模板，跳过选择菜单
 cce add deepseek ds              # 再省一步：预设新 env 的名字为 ds
-cce add --list                   # 只列出能用的模板（名称/描述/来自哪个文件），不创建
-cce add --templates ./team.json  # 本次额外挂载一个外部模板文件（见下）
+cce template ls                  # 只列出能用的模板（名称/描述/来自哪个文件），不创建
+cce add --from ./team.json       # 本次改用一个外部模板文件（路径）
+cce add --from https://host/t.json  # 本次改用一个远程模板文件（URL）
 ```
 
 **一次创建大致是这样：**
@@ -160,19 +162,45 @@ cce add --templates ./team.json  # 本次额外挂载一个外部模板文件（
 
 ### 模板从哪来
 
+默认模板**不再随 npm 包发布**，而是从 GitHub 仓库实时获取（这样你总能拿到最新的），并缓存到本地。
 `cce add` 解析模板时按下面的顺序叠加，**后面的同名模板覆盖前面的**：
 
 ```
-内置模板（随 cce 一起发布）
+默认模板（远端获取 + 本地缓存 templates.remote.json）
   └─ 被覆盖 → ~/.claude/cce/templates.json （你自己的模板，可选）
-        └─ 被覆盖 → cce add --templates <路径> 指定的文件（仅本次）
 ```
 
-- **内置**：随包自带 DeepSeek、Kimi、GLM 几个常用模板，开箱即用。
+带了 `--from <路径|URL>` 时，**默认模板这一层换成你指定的来源**（不联网拉默认的），你的 `templates.json` 仍然叠加在上面。
+
+- **默认（远端 + 缓存）**：首次 `cce add` 时从默认源下载 DeepSeek、Kimi、GLM 等常用模板，存到
+  `~/.claude/cce/templates.remote.json`。之后 **24 小时**内直接用缓存；过期再拉一次。
+  默认源是 jsDelivr（CDN，国内可达），失败时回落到 GitHub raw。
+  - **下载失败怎么办**：cce 会打印模板的下载链接和应保存到的路径——在有网的设备上下载，拷到那个路径即可。
+  - 用 `cce template` 系列命令可以查看/刷新/换源/离线，见下一节。
 - **用户文件**：在配置目录放一个 `templates.json`（与 `config.json` 同级），就能增加你自己的模板，
-  或用同名 key 覆盖内置的。
-- **`--templates <路径>`**：只影响这一次运行，适合临时试用别人发来的模板文件。它**只是换个模板来源**，
-  其余流程（选→填→命名→写入、以及 `--list`）都照常。
+  或用同名 key 覆盖默认的。
+- **`--from <路径|URL>`**：只影响这一次运行（不写缓存、不改配置）。值以 `http://` / `https://` 开头按
+  URL 处理，否则当作本地文件路径。适合临时试用别人发来的模板文件。
+
+### 管理模板（cce template）
+
+`cce template`（别名 `cce tpl`）集中管理默认模板的来源与缓存。**只在你用默认模板（没带 `--from`）时才有意义。**
+
+```bash
+cce template                 # 状态总览：当前 url、是否离线、缓存里有几个模板/拉取于多久前
+cce template ls              # 列出可用模板（= 旧的 cce add --list）
+cce template list            # 同 ls
+cce template show deepseek   # 看某个模板的固定 env + 待填字段
+cce template refresh         # 立刻重新下载（忽略 24h TTL 和离线开关），失败则打印链接
+cce template url <url>       # 把默认源改成你给的单个 URL（如内网镜像）——设了就只用它，不再走 jsDelivr/raw
+cce template url --none      # 清除上面的设置，回到默认源
+cce template offline on      # 开启离线：永不联网，只用本地缓存，且不做 24h 过期检查
+cce template offline off     # 关闭离线
+```
+
+> **内网 / 离线机器**：两种办法。① 有内网镜像就 `cce template url <镜像地址>`；
+> ② 没有就在有网设备下载默认模板文件，拷到 `~/.claude/cce/templates.remote.json`，再 `cce template offline on`
+> ——这样 `cce add` 永不联网，直接用这份缓存。
 
 ### 模板文件格式
 
@@ -227,7 +255,9 @@ cce add --templates ./team.json  # 本次额外挂载一个外部模板文件（
 
 用 `CCE_CONFIG_HOME` 环境变量可覆盖该目录（便于 CI 或团队约定）。首次运行时若不存在会写入一份起始配置。
 
-> 同一目录下还有一个 `update-check.json`，是 cce **自动管理**的更新检查缓存（记录上次检查时间、查到的最新版本等），不需要你手动编辑。
+> 同一目录下还有两个 cce **自动管理**的文件，不需要你手动编辑：
+> - `cache.json` —— 缓存状态（更新检查记录、模板上次拉取时间/etag 等）。
+> - `templates.remote.json` —— 下载下来的默认模板（结构与远端一致；离线时可手动放置）。
 
 ### 完整 schema
 
@@ -239,6 +269,9 @@ cce add --templates ./team.json  # 本次额外挂载一个外部模板文件（
 | `args` | string | 否 | **全局**默认 claude CLI 参数（shell 分词）。前置注入到每次启动。 |
 | `settingsMode` | `"override"` \| `"merge-cce"` \| `"merge-claude"` | 否 | **全局**默认合并模式。默认 `override`。 |
 | `updateMode` | `"auto"` \| `"prompt"` \| `"off"` | 否 | 启动时如何处理自我更新。默认 `auto`。见 [更新 cce](#更新-cce)。 |
+| `template` | object | 否 | 模板来源设置。建议用 `cce template url` / `cce template offline` 管理，而非手改。 |
+| `template.url` | string \| null | 否 | 默认模板的远端 URL。`null` = 用内置默认源（jsDelivr + GitHub raw 兜底）。设为单个 URL（如内网镜像）则只用它、不兜底。 |
+| `template.offline` | boolean | 否 | 默认 `false`。为 `true` 时 `cce add` 永不联网：直接用本地缓存 `templates.remote.json`，且跳过 24h 过期检查。 |
 | `envs.<name>` | object | 是 | 一个命名 env。键名就是你传给 `-e` 的值。必须匹配 `[A-Za-z0-9][A-Za-z0-9._-]*`。 |
 | `envs.<name>.description` | string | 否 | 在 `cce list` 和 `cce show` 中展示。 |
 | `envs.<name>.env` | object | 是 | 为该服务商注入的环境变量。结构与 claude `settings.json` 的 `env` 块一致。值可含 `${VAR}` 占位符，启动时从你命令行环境里解析。 |

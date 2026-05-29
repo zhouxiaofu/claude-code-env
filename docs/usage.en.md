@@ -101,7 +101,9 @@ cce -e kimi -m cce                               # merge env with settings.json,
 | Command | Description |
 |---|---|
 | `list`, `ls` | List all envs; `*` marks the current default. |
-| `add [tpl] [name]` | **Create an env from a template** (interactively pick a template and fill in fields). `--list` just lists available templates; `--templates <path>` mounts an external template file. See [Create an env from a template](#create-an-env-from-a-template). |
+| `add [tpl] [name]` | **Create an env from a template** (interactively pick a template and fill in fields). `--from <path\|URL>` uses an alternate template source for this run. See [Create an env from a template](#create-an-env-from-a-template). |
+| `remove`, `rm [name]` | Remove an env (asks to confirm; `-y` skips; no name = picker). Clears the default if the removed env was it. |
+| `template`, `tpl [...]` | Manage the template source and cache: `ls`/`list`, `show <name>`, `refresh`, `url`, `offline`. See [Managing templates (cce template)](#managing-templates-cce-template). |
 | `show <name>` | Show an env's variables, its resolved settings mode, and the merged claude args (with per-layer source labels). API tokens are masked. |
 | `edit` | Open `config.json` in `$EDITOR` (Windows default: notepad). The canonical way to add/edit/remove envs by hand. |
 | `use <name>` | Set the default env. `cce use --none` clears it. |
@@ -113,10 +115,9 @@ cce -e kimi -m cce                               # merge env with settings.json,
 | `help` | Show help. |
 
 > `cce add` does exactly one thing: **quickly scaffold an env from a template**.
-> For bulk add/edit/delete or fine-grained hand-editing, `cce edit` opens the JSON
+> For bulk add/edit or fine-grained hand-editing, `cce edit` opens the JSON
 > directly (the file carries a `$schema` reference, so editors give you completion
-> and validation). There is intentionally **no** `cce remove`: deleting an env is
-> just removing its block in `cce edit`.
+> and validation).
 
 ---
 
@@ -130,8 +131,9 @@ API key), and it writes the whole thing into `config.json`.
 cce add                          # pick a template → fill fields → name it → write
 cce add deepseek                 # use the "deepseek" template directly, skip the menu
 cce add deepseek ds              # also preset the new env's name to "ds"
-cce add --list                   # just list available templates (name/description/source), no creation
-cce add --templates ./team.json  # mount an extra external template file for this run (see below)
+cce template ls                  # just list available templates (name/description/source), no creation
+cce add --from ./team.json       # use an external template file (path) for this run
+cce add --from https://host/t.json  # use a remote template file (URL) for this run
 ```
 
 **A run goes roughly like this:**
@@ -155,21 +157,54 @@ cce add --templates ./team.json  # mount an extra external template file for thi
 
 ### Where templates come from
 
-`cce add` resolves templates by layering the sources below, where a **later source
-overrides an earlier one by template name**:
+The default templates are **no longer bundled with the npm package** — they are
+fetched live from the GitHub repo (so you always get the latest) and cached
+locally. `cce add` layers the sources below, where a **later source overrides an
+earlier one by template name**:
 
 ```
-Built-in templates (shipped with cce)
+Default templates (fetched remotely + cached in templates.remote.json)
   └─ overridden by → ~/.claude/cce/templates.json   (your own templates, optional)
-        └─ overridden by → the file from cce add --templates <path>  (this run only)
 ```
 
-- **Built-in**: DeepSeek, Kimi, and GLM ship with the package, usable out of the box.
+With `--from <path|URL>`, the **default layer is replaced** by the source you give
+(no remote fetch of the defaults); your `templates.json` still layers on top.
+
+- **Default (remote + cache)**: on the first `cce add`, DeepSeek/Kimi/GLM and friends
+  are downloaded from the default source into `~/.claude/cce/templates.remote.json`.
+  For the next **24 hours** the cache is used as-is; after that it refetches once.
+  The default source is jsDelivr (a CDN, reachable in mainland China), falling back
+  to GitHub raw.
+  - **If the download fails**, cce prints the template URL and the path to save it
+    to — download it on a networked device and drop it in there.
+  - Use the `cce template` commands to inspect / refresh / re-point / go offline (next section).
 - **User file**: drop a `templates.json` in the config dir (next to `config.json`)
-  to add your own templates, or override a built-in one by reusing its key.
-- **`--templates <path>`**: affects this run only — handy for trying a template
-  file someone sent you. It **only swaps the template source**; the rest of the
-  flow (pick → fill → name → write, and `--list`) runs exactly the same.
+  to add your own templates, or override a default one by reusing its key.
+- **`--from <path|URL>`**: affects this run only (no cache write, no config change).
+  A value starting with `http://` / `https://` is treated as a URL, otherwise as a
+  local file path. Handy for trying a template file someone sent you.
+
+### Managing templates (cce template)
+
+`cce template` (alias `cce tpl`) centralizes the source and cache of the default
+templates. **It only matters when you use the default templates (no `--from`).**
+
+```bash
+cce template                 # status: current url, offline flag, #cached templates / how long ago fetched
+cce template ls              # list available templates (= the old cce add --list)
+cce template list            # same as ls
+cce template show deepseek   # show a template's fixed env + fields to fill
+cce template refresh         # re-download now (ignores the 24h TTL and offline flag); prints the URL on failure
+cce template url <url>       # point the default source at a single URL (e.g. an intranet mirror) — no jsDelivr/raw fallback
+cce template url --none      # clear the override, back to the default sources
+cce template offline on      # offline: never hit the network, use the local cache only, skip the 24h TTL
+cce template offline off     # turn offline off
+```
+
+> **Intranet / air-gapped machines**: two options. ① If you have an internal mirror,
+> `cce template url <mirror>`. ② Otherwise download the default template file on a
+> networked device, copy it to `~/.claude/cce/templates.remote.json`, then
+> `cce template offline on` — now `cce add` never touches the network.
 
 ### Template file format
 
@@ -227,9 +262,10 @@ A template file is a JSON object whose **keys are the template names**. Each tem
 Override the directory with the `CCE_CONFIG_HOME` env var (useful for CI or team
 conventions). The first run writes a starter config if none exists.
 
-> The same directory also holds an `update-check.json` — a cce-managed cache for
-> the update check (last-check time, the latest version seen, etc.). You never
-> need to edit it by hand.
+> The same directory also holds two cce-managed files you never need to edit:
+> - `cache.json` — cache state (update-check records, template last-fetch time/etag, etc.).
+> - `templates.remote.json` — the downloaded default templates (same shape as the
+>   remote; you can drop it in by hand for offline use).
 
 ### Full schema
 
@@ -241,6 +277,9 @@ conventions). The first run writes a starter config if none exists.
 | `args` | string | no | **Global** default claude CLI args (shell-tokenized). Prepended to every launch. |
 | `settingsMode` | `"override"` \| `"merge-cce"` \| `"merge-claude"` | no | **Global** default reconciliation mode. Default `override`. |
 | `updateMode` | `"auto"` \| `"prompt"` \| `"off"` | no | How self-update behaves at launch. Default `auto`. See [Updating cce](#updating-cce). |
+| `template` | object | no | Template source settings. Prefer managing via `cce template url` / `cce template offline` over hand-editing. |
+| `template.url` | string \| null | no | Remote URL for the default templates. `null` = use the built-in default sources (jsDelivr + GitHub raw fallback). Set to a single URL (e.g. an intranet mirror) to use only that, with no fallback. |
+| `template.offline` | boolean | no | Default `false`. When `true`, `cce add` never hits the network: it uses the local cache `templates.remote.json` and skips the 24h TTL check. |
 | `envs.<name>` | object | yes | A named env. The key is what you pass to `-e`. Must match `[A-Za-z0-9][A-Za-z0-9._-]*`. |
 | `envs.<name>.description` | string | no | Shown in `cce list` and `cce show`. |
 | `envs.<name>.env` | object | yes | Env vars injected for this provider. Same shape as claude's `settings.json` `env` block. Values may contain `${VAR}` placeholders, resolved from the parent shell at launch. |

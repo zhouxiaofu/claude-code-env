@@ -41,7 +41,7 @@ windows use two providers at once. `cce` injects env vars **only into the
 ## Features
 
 - 🚀 **One command** — inject a provider's env and start `claude` in one go.
-- 🧩 **Template-based setup** — `cce add` picks a built-in template (DeepSeek, Kimi, GLM), you fill in your API key, and it writes a ready-to-use env; bring your own template file too (see [Create an env from a template](docs/usage.en.md#create-an-env-from-a-template)).
+- 🧩 **Template-based setup** — `cce add` picks a template (DeepSeek, Kimi, GLM), you fill in your API key, and it writes a ready-to-use env; templates are fetched live from GitHub and cached locally, managed with `cce template` (source/offline) (see [Create an env from a template](docs/usage.en.md#create-an-env-from-a-template)).
 - 🪟 **Per-process isolation** — run different providers in different windows simultaneously; your shell and system env are never modified.
 - ⚙️ **Default args management** — store common claude flags (e.g. `--permission-mode bypassPermissions`) globally or per-env; `-a` to merge, `-A` to override.
 - 🔀 **settings.json reconciliation** — three modes (`override` / `cce` / `claude`) decide how an env merges with your `~/.claude/settings.json`. cce **never edits** that file; it builds a short-lived temp file and runs `claude --settings`.

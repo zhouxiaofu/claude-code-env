@@ -18,6 +18,7 @@ const SUBCOMMANDS = new Set([
   'list', 'ls',
   'add',
   'remove', 'rm',
+  'template', 'tpl',
   'show',
   'edit',
   'use',
@@ -183,6 +184,7 @@ function parseLaunch(argv) {
 function normalizeSubcommand(name) {
   if (name === 'ls') return 'list';
   if (name === 'rm') return 'remove';
+  if (name === 'tpl') return 'template';
   return name;
 }
 

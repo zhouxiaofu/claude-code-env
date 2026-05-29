@@ -71,6 +71,7 @@ function defaultConfig() {
     args: '',
     settingsMode: DEFAULT_SETTINGS_MODE,
     updateMode: DEFAULT_UPDATE_MODE,
+    template: { url: null, offline: false },
     envs: {},
   };
 }
@@ -125,6 +126,10 @@ function normalize(cfg) {
     const rootMode = normalizeMode(cfg.settingsMode);
     if (rootMode) out.settingsMode = rootMode;
     if (UPDATE_MODES.includes(cfg.updateMode)) out.updateMode = cfg.updateMode;
+    if (cfg.template && typeof cfg.template === 'object') {
+      if (typeof cfg.template.url === 'string' && cfg.template.url) out.template.url = cfg.template.url;
+      if (cfg.template.offline === true) out.template.offline = true;
+    }
     if (cfg.envs && typeof cfg.envs === 'object') {
       for (const [name, entry] of Object.entries(cfg.envs)) {
         if (!entry || typeof entry !== 'object') continue;

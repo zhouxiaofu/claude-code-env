@@ -880,3 +880,63 @@ env's single-string `description`.
 - Tests in `test/templates.test.js`: `localize` fallbacks, template normalization,
   `buildEnvFromTemplate`, source-override merge, missing-file / bad-JSON errors,
   name validation.
+
+> **Superseded later**: §15.2's "bundled with the package" + the `--templates` entry
+> were replaced by the remote-templates design in v0.6; `cce remove` shipped in v0.5
+> (with confirmation). Current design is §16.
+
+---
+
+## 16. Remote templates + `cce template` (v0.6)
+
+### 16.1 Motivation
+
+Bundling the default templates in the npm package freezes them per release — changing
+a model name needs a publish, and users only get it after upgrading. Fetching the
+defaults live from the GitHub repo (with a local cache) means users always get the
+latest, and editing templates no longer requires a release.
+
+### 16.2 Key trade-offs
+
+| Decision | Choice | Why |
+|---|---|---|
+| Keep a bundle | **No** (user's call) | Running `npm i -g` implies network; on offline/failure we print the URL for a manual download — more controllable than a frozen bundle |
+| Default source | jsDelivr primary + GitHub raw fallback | jsDelivr is reachable in mainland China; raw is often blocked, fallback only |
+| Source file location | repo-root `templates/builtin.json` (out of `src/`, not packaged) | decoupled from code; `files` only has `src/`, so it's never shipped |
+| TTL | 24h, from `cache.json` `fetchedAt` | not file mtime (rewritten by backup/sync/copy — unreliable) |
+| Cache files | payload in `templates.remote.json` (mirrors remote), metadata in `cache.json` | mirror shape → a failed download can be saved verbatim to that path, no import command |
+| Unified cache | drop `update-check.json`, all machine state in `cache.json` (`update` / `template` sections) | one cache file; the old file is left orphaned (few users, low impact) |
+| One-time source | `cce add --from <path\|url>` (replaces `--templates`), `^https?://` ⇒ URL else path | one entry for local/remote; no cache write, no config change |
+| Intranet/offline | `config.template.url` (single mirror, no fallback) + `config.template.offline` (never network, skip TTL) | two paths: set url if you have a mirror; else drop the cache file + offline |
+
+### 16.3 Load chain
+
+```
+base layer: the --from source  OR  the remote/cache templates.remote.json
+  └─ overlaid by ~/.claude/cce/templates.json (user file)
+empty result → contextual error (offline-no-cache / fetch-failed / --from-empty) printing the URL + save path
+```
+
+Remote layer: `offline` → read cache only, no network, ignore TTL; else fresh cache
+(`now-fetchedAt<24h`) is used, stale/absent triggers a fetch (`config.template.url` if
+set, else jsDelivr→raw). Success writes the cache + an `etag` into `cache.json` (next
+run sends `If-None-Match`; a 304 just refreshes `fetchedAt`); all-fail falls back to a
+stale cache (warns) or errors.
+
+### 16.4 The `cce template` subcommand (alias `tpl`)
+
+Bare `cce template` prints a status overview (url / offline / cache count + age, **no
+network**); `ls`/`list` lists templates (replaces `cce add --list`); `show <name>`
+shows a single template's env + required fields; `refresh` forces a fetch (ignoring TTL
++ offline); `url [<url>|--none]` and `offline [on|off]` read/write `config.template`.
+**Template-name completion (`completion --templates`) is cache-only (`allowFetch:false`)
+— never network, never throws.**
+
+### 16.5 What was added / changed
+
+- New `src/cache.js` (unified `cache.json`), `src/commands/template.js`; moved `src/templates.builtin.json` → `templates/builtin.json`.
+- Rewrote `src/templates.js`: remote fetch + cache + `--from` + offline + contextual errors; `loadTemplates` is now **async**.
+- `src/update.js` `readState`/`writeState` became thin wrappers over `cache.js` `readUpdate`/`writeUpdate`.
+- `src/config.js` + `schema.json` gained `template { url, offline }`; `src/commands/add.js` renamed `--templates`→`--from` and dropped `--list`/`runList`.
+- `parser.js`/`cli.js` register `template`/`tpl` (dispatch made async); `completion.js` adds the `template` subcommand + `--from` for all four shells; `help.js` and i18n (`template.*` keys; removed `add.list*`/`add.noTemplates*`/`add.templatesNeedsPath`) follow.
+- Tests: rewrote `test/templates.test.js` (offline cache + user overlay, `--from`, stubbed fetch writing the cache); added `test/cache.test.js`.

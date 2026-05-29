@@ -125,10 +125,8 @@ module.exports = {
   'add.setDefaultPrompt': '把 "{name}" 设为默认 env 吗？[y/N]',
   'add.launchHint': '用 `cce -e {name}` 启动它（用 `cce show {name}` 查看）。',
   'add.templateNotFound': '找不到模板 "{name}"。可用：{available}',
-  'add.noTemplates': '没有可用的模板。可在 {file} 里添加，或用 --templates <路径> 指定。',
-  'add.needTemplateArg': '选择模板需要 TTY。请直接给出模板名：`cce add <模板>`（用 `cce add --list` 查看）。',
+  'add.needTemplateArg': '选择模板需要 TTY。请直接给出模板名：`cce add <模板>`（用 `cce template ls` 查看）。',
   'add.needInteractiveFill': '该模板有需要填写的字段，需要 TTY。请用 `cce add` 交互式运行。',
-  'add.templatesNeedsPath': '--templates 需要一个文件路径',
   'add.unknownOption': '`cce add` 不认识的选项：{tok}',
   'add.fileParseFailed': '无法解析模板文件 {file}：{message}',
   'add.fileNotFound': '找不到模板文件：{file}',
@@ -136,7 +134,46 @@ module.exports = {
   'add.listTitle': '可用的模板：',
   'add.listSource': '来自：{file}',
   'add.listFields': '待填字段：{names}',
-  'add.noTemplatesList': '没有可用的模板。',
+
+  // template command + remote source
+  'template.fromNeedsValue': '--from 需要一个路径或 URL',
+  'template.fromFetchFailed': '无法从 {src} 获取模板（{reason}）。',
+  'template.fromEmpty': '{src} 里没有任何模板。',
+  'template.usingStale': '无法刷新模板 —— 使用本地缓存（可能不是最新）。',
+  'template.offlineNoCache':
+    '离线模式已开启，但本地没有模板缓存文件。\n' +
+    '请在有网络的机器上下载：\n  {url}\n' +
+    '然后保存到：\n  {path}',
+  'template.fetchFailed':
+    '无法下载模板（{reason}）。\n' +
+    '请在有网络的设备上打开：\n  {url}\n' +
+    '然后把文件保存到：\n  {path}\n' +
+    '（或用 `cce template url <url>` 设置一个内网镜像）。',
+  'template.none': '没有可用的模板。来源：{url}',
+  'template.unknownSub': '`cce template` 不认识的子命令：{sub}（可用：ls | show | refresh | url | offline）',
+  'template.statusTitle': '模板来源：',
+  'template.statusUrl': 'url     ',
+  'template.statusUrlDefault': '（默认：jsDelivr + GitHub raw 兜底）',
+  'template.statusOffline': 'offline ',
+  'template.statusCache': 'cache   ',
+  'template.statusCacheInfo': '{count} 个模板，{age}前拉取',
+  'template.statusCacheNone': '暂无（首次 `cce add` 时下载）',
+  'template.statusUnknown': '未知',
+  'template.statusHint': '管理：cce template url <url|--none> · cce template offline on|off · cce template refresh',
+  'template.ageMinutes': '{n} 分钟',
+  'template.ageHours': '{n} 小时',
+  'template.ageDays': '{n} 天',
+  'template.showUsage': '用法：cce template show <名称>',
+  'template.showHeader': '模板：{name}',
+  'template.showRequired': '待填字段（由你填写）：',
+  'template.showFooter': '用 `cce add {name}` 从它创建一个 env。',
+  'template.refreshing': '正在刷新模板…',
+  'template.refreshed': '模板已刷新（共 {count} 个）。',
+  'template.urlCleared': '已清除模板 URL —— 使用默认来源。',
+  'template.urlInvalid': '不是合法 URL："{val}"（需以 http:// 或 https:// 开头）。用 `cce template url --none` 可重置。',
+  'template.urlSet': '模板 URL 已设为 {url}',
+  'template.offlineSet': '模板离线模式：{state}',
+  'template.offlineInvalid': '无效的值 "{val}"。用法：cce template offline on|off',
 
   // remove
   'remove.unknownOption': '`cce remove` 不认识的选项：{tok}',

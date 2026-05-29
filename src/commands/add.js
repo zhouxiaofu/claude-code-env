@@ -13,33 +13,30 @@ function isInteractive() {
   return Boolean(process.stdin.isTTY && process.stdout.isTTY);
 }
 
-// Parse `cce add` args: [template] [name] with --templates <path> / --list flags.
+// Parse `cce add` args: [template] [name] with a --from <path|url> override.
 function parseArgs(args) {
-  let templatesPath = null;
-  let list = false;
+  let from = null;
   const positionals = [];
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
-    if (a === '--list') { list = true; continue; }
-    if (a === '--templates') {
+    if (a === '--from') {
       const next = args[i + 1];
       if (next === undefined || next.startsWith('-')) {
-        throw new tpl.TemplateError(t('add.templatesNeedsPath'));
+        throw new tpl.TemplateError(t('template.fromNeedsValue'));
       }
-      templatesPath = next;
+      from = next;
       i += 1;
       continue;
     }
-    const eq = a.match(/^--templates=(.+)$/);
-    if (eq) { templatesPath = eq[1]; continue; }
+    const eq = a.match(/^--from=(.+)$/);
+    if (eq) { from = eq[1]; continue; }
     if (a.startsWith('-')) throw new tpl.TemplateError(t('add.unknownOption', { tok: a }));
     positionals.push(a);
   }
 
   return {
-    templatesPath,
-    list,
+    from,
     templateName: positionals[0] || null,
     envName: positionals[1] || null,
   };
@@ -50,20 +47,13 @@ async function run(args) {
   let templates;
   try {
     opts = parseArgs(args);
-    templates = tpl.loadTemplates({ extraPath: opts.templatesPath });
+    templates = await tpl.loadTemplates({ from: opts.from });
   } catch (e) {
     if (e instanceof tpl.TemplateError) {
       log.error(e.message);
       return 1;
     }
     throw e;
-  }
-
-  if (opts.list) return runList(templates);
-
-  if (templates.size === 0) {
-    log.error(t('add.noTemplates', { file: tpl.userTemplatesPath() }));
-    return 1;
   }
 
   // 1) Resolve which template.
@@ -130,25 +120,6 @@ async function run(args) {
   }
 
   log.info(t('add.launchHint', { name }));
-  return 0;
-}
-
-// --list: print resolved templates, their description, and which file each came from.
-function runList(templates) {
-  const arr = [...templates.values()].sort((a, b) => a.name.localeCompare(b.name));
-  if (arr.length === 0) {
-    log.plain(t('add.noTemplatesList'));
-    return 0;
-  }
-  log.plain(pc.bold(t('add.listTitle')));
-  for (const tp of arr) {
-    const desc = localize(tp.description);
-    log.plain(`  ${pc.cyan(tp.name)}${desc ? '  ' + pc.dim(desc) : ''}`);
-    if (tp.required.length > 0) {
-      log.plain(`     ${pc.dim(t('add.listFields', { names: tp.required.map((r) => r.name).join(', ') }))}`);
-    }
-    log.plain(`     ${pc.dim(t('add.listSource', { file: tp.source }))}`);
-  }
   return 0;
 }
 

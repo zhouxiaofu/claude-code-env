@@ -35,6 +35,23 @@
       "default": "auto",
       "description": "How cce self-updates at launch. auto (default): silently install a newer version in the background. prompt: on the next interactive launch, show an Update now / Skip this version menu (a skipped version is not offered again until a newer one ships). off: never check at launch. Manual `cce update` works regardless. The launch check is throttled to ~3h and only prompts in a TTY; disable a single run with CCE_NO_UPDATE_CHECK=1."
     },
+    "template": {
+      "type": "object",
+      "description": "Settings for the `cce add` template source. Manage with `cce template url` / `cce template offline`.",
+      "properties": {
+        "url": {
+          "type": ["string", "null"],
+          "default": null,
+          "description": "Remote URL for the default template file (builtin.json shape). null = use the bundled default sources (jsDelivr with a GitHub raw fallback). Set to a single URL (e.g. an intranet mirror) to use only that — no fallback. Set with `cce template url <url>`, clear with `cce template url --none`."
+        },
+        "offline": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, `cce add` never reaches the network: it uses the locally cached templates (~/.claude/cce/templates.remote.json) regardless of age, and skips the 24h TTL check. Useful on intranet/air-gapped machines where you place the cache file by hand. Set with `cce template offline on|off`."
+        }
+      },
+      "additionalProperties": false
+    },
     "envs": {
       "type": "object",
       "patternProperties": {

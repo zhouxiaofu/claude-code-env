@@ -6,7 +6,7 @@ const { t } = require('../i18n');
 
 // `cce completion <shell>`     — print a completion script to stdout.
 // `cce completion --envs`      — internal: emit newline-separated env names for completion to consume.
-function run(args) {
+async function run(args) {
   if (args[0] === '--envs' || args[0] === '__envs__') {
     let cfg;
     try {
@@ -19,9 +19,10 @@ function run(args) {
   }
 
   if (args[0] === '--templates' || args[0] === '__templates__') {
+    // Cache-only: completion must be instant and must NEVER hit the network.
     try {
-      const names = [...require('../templates').loadTemplates().keys()].sort();
-      process.stdout.write(names.join('\n') + '\n');
+      const map = await require('../templates').loadTemplates({ allowFetch: false });
+      process.stdout.write([...map.keys()].sort().join('\n') + '\n');
     } catch {
       /* ignore — completion must never error */
     }
@@ -54,10 +55,11 @@ function run(args) {
   }
 }
 
-const SUB = ['list', 'ls', 'add', 'remove', 'rm', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'update', 'help'];
+const SUB = ['list', 'ls', 'add', 'remove', 'rm', 'template', 'tpl', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'update', 'help'];
 const TOP_FLAGS = ['-e', '--env', '-a', '-A', '-m', '--merge-mode', '-h', '--help', '-v', '--version'];
 const MERGE_MODES = ['override', 'cce', 'claude'];
 const LANGS = ['en', 'zh-CN', 'auto'];
+const TEMPLATE_SUB = ['ls', 'list', 'show', 'refresh', 'url', 'offline'];
 
 function bashScript() {
   return `# cce bash completion — install with: cce completion bash >> ~/.bashrc
@@ -82,7 +84,11 @@ _cce_completion() {
     add)
       local tpls
       tpls="$(cce completion --templates 2>/dev/null)"
-      COMPREPLY=( $(compgen -W "$tpls --list --templates" -- "$cur") )
+      COMPREPLY=( $(compgen -W "$tpls --from" -- "$cur") )
+      return 0
+      ;;
+    template|tpl)
+      COMPREPLY=( $(compgen -W "${TEMPLATE_SUB.join(' ')}" -- "$cur") )
       return 0
       ;;
     update)
@@ -134,7 +140,11 @@ _cce() {
     add)
       local tpls
       tpls=($(cce completion --templates 2>/dev/null))
-      compadd -- $tpls --list --templates
+      compadd -- $tpls --from
+      return
+      ;;
+    template|tpl)
+      compadd -- ${TEMPLATE_SUB.join(' ')}
       return
       ;;
     update)
@@ -172,7 +182,7 @@ function __cce_templates
 end
 
 # Subcommands (only when no subcommand has been typed yet)
-complete -c cce -n '__fish_use_subcommand' -a 'list ls add remove rm show edit use current lang pick completion update help'
+complete -c cce -n '__fish_use_subcommand' -a 'list ls add remove rm template tpl show edit use current lang pick completion update help'
 complete -c cce -n '__fish_use_subcommand' -s e -l env -a '(__cce_envs)' -d 'Use an env'
 complete -c cce -n '__fish_use_subcommand' -s a -d 'Merge claude args'
 complete -c cce -n '__fish_use_subcommand' -s A -d 'Override claude args'
@@ -186,7 +196,8 @@ end
 complete -c cce -n '__fish_seen_subcommand_from completion' -a 'bash zsh powershell fish'
 complete -c cce -n '__fish_seen_subcommand_from lang' -a 'en zh-CN auto'
 complete -c cce -n '__fish_seen_subcommand_from update' -a '--check'
-complete -c cce -n '__fish_seen_subcommand_from add' -a '(__cce_templates) --list --templates'
+complete -c cce -n '__fish_seen_subcommand_from add' -a '(__cce_templates) --from'
+complete -c cce -n '__fish_seen_subcommand_from template tpl' -a 'ls list show refresh url offline'
 
 # -e/--env arg completion at any position before pass-through
 complete -c cce -s e -l env -a '(__cce_envs)' -d 'Use an env'
@@ -217,7 +228,7 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
         } catch { @() }
     }
 
-    $subcommands = @('list','ls','add','remove','rm','show','edit','use','current','lang','pick','completion','update','help')
+    $subcommands = @('list','ls','add','remove','rm','template','tpl','show','edit','use','current','lang','pick','completion','update','help')
     $flags       = @('-e','--env','-m','--merge-mode','-h','--help','-v','--version')
 
     # Complete env names after these tokens
@@ -252,7 +263,13 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
     }
 
     if ($prev -eq 'add') {
-        (_Templates) + @('--list','--templates') | Where-Object { $_ -like "$wordToComplete*" } |
+        (_Templates) + @('--from') | Where-Object { $_ -like "$wordToComplete*" } |
+            ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
+        return
+    }
+
+    if ($prev -in @('template','tpl')) {
+        @('ls','list','show','refresh','url','offline') | Where-Object { $_ -like "$wordToComplete*" } |
             ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
         return
     }

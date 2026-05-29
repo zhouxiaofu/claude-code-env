@@ -59,13 +59,14 @@ async function runSubcommand(name, args) {
     case 'list':       return require('./commands/list').run(args);
     case 'add':        return await require('./commands/add').run(args);
     case 'remove':     return await require('./commands/remove').run(args);
+    case 'template':   return await require('./commands/template').run(args);
     case 'show':       return require('./commands/show').run(args);
     case 'edit':       return require('./commands/edit').run(args);
     case 'use':        return require('./commands/use').run(args);
     case 'current':    return require('./commands/current').run(args);
     case 'lang':       return require('./commands/lang').run(args);
     case 'pick':       return await require('./commands/pick').run(args);
-    case 'completion': return require('./commands/completion').run(args);
+    case 'completion': return await require('./commands/completion').run(args);
     case 'update':     return await require('./commands/update').run(args);
     case 'help':       return require('./commands/help').run();
     default:

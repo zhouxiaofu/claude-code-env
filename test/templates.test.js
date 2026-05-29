@@ -10,15 +10,27 @@ const i18n = require('../src/i18n');
 const templates = require('../src/templates');
 const config = require('../src/config');
 
+function withTempConfigHome(fn) {
+  return async () => {
+    const prev = process.env.CCE_CONFIG_HOME;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cce-tpl-'));
+    process.env.CCE_CONFIG_HOME = dir;
+    try {
+      await fn(dir);
+    } finally {
+      if (prev === undefined) delete process.env.CCE_CONFIG_HOME;
+      else process.env.CCE_CONFIG_HOME = prev;
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  };
+}
+
 test('localize: string passes through, object resolves by lang with fallbacks', () => {
   i18n.setLang('zh-CN');
   assert.strictEqual(i18n.localize('plain'), 'plain');
   assert.strictEqual(i18n.localize({ en: 'Hello', 'zh-CN': '你好' }), '你好');
-  // current lang missing → fall back to en
   assert.strictEqual(i18n.localize({ en: 'Hello', fr: 'Bonjour' }), 'Hello');
-  // neither current nor en → first non-empty value
   assert.strictEqual(i18n.localize({ fr: 'Bonjour', de: 'Hallo' }), 'Bonjour');
-  // empty / null → '' (caller renders nothing)
   assert.strictEqual(i18n.localize(null), '');
   assert.strictEqual(i18n.localize({}), '');
   assert.strictEqual(i18n.localize({ en: '   ' }), '');
@@ -42,7 +54,7 @@ test('normalizeTemplate drops non-string env values and malformed required items
   assert.strictEqual(tpl.required.length, 3);
   assert.deepStrictEqual(tpl.required[0], { name: 'TOK', description: { en: 'token' } });
   assert.deepStrictEqual(tpl.required[1], { name: 'WITH_DEFAULT', description: null, default: 'd' });
-  assert.deepStrictEqual(tpl.required[2], { name: 'BAD_DEFAULT', description: null }); // non-string default dropped
+  assert.deepStrictEqual(tpl.required[2], { name: 'BAD_DEFAULT', description: null });
   assert.strictEqual(tpl.source, 'file.json');
 });
 
@@ -57,69 +69,86 @@ test('buildEnvFromTemplate merges answers over the fixed env', () => {
     ANTHROPIC_MODEL: 'm',
     ANTHROPIC_AUTH_TOKEN: 'sk-123',
   });
-  // No answers (empty required) → just the fixed env.
   assert.deepStrictEqual(templates.buildEnvFromTemplate(tpl, {}), {
     ANTHROPIC_BASE_URL: 'https://x',
     ANTHROPIC_MODEL: 'm',
   });
 });
 
-test('loadTemplates ships built-ins and a user file overrides by name', () => {
-  const prev = process.env.CCE_CONFIG_HOME;
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cce-tpl-'));
-  process.env.CCE_CONFIG_HOME = dir;
-  try {
-    // Built-ins are available out of the box.
-    const builtins = templates.loadTemplates();
-    assert.ok(builtins.has('deepseek'));
-    assert.ok(builtins.has('kimi'));
-
-    // A user file overrides the built-in 'deepseek' wholesale and adds 'mine'.
-    fs.writeFileSync(
-      templates.userTemplatesPath(),
-      JSON.stringify({
-        deepseek: { description: 'custom ds', env: { ANTHROPIC_BASE_URL: 'https://custom' }, required: [] },
-        mine: { description: 'mine', env: { ANTHROPIC_MODEL: 'z' }, required: [] },
-      })
-    );
-    const merged = templates.loadTemplates();
-    assert.strictEqual(merged.get('deepseek').env.ANTHROPIC_BASE_URL, 'https://custom');
-    assert.ok(merged.has('mine'));
-    assert.ok(merged.has('kimi')); // untouched built-in still present
-  } finally {
-    if (prev === undefined) delete process.env.CCE_CONFIG_HOME;
-    else process.env.CCE_CONFIG_HOME = prev;
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+test('isUrl distinguishes URLs from file paths', () => {
+  assert.ok(templates.isUrl('https://x/y.json'));
+  assert.ok(templates.isUrl('http://x/y.json'));
+  assert.ok(!templates.isUrl('./team.json'));
+  assert.ok(!templates.isUrl('C:\\templates.json'));
 });
 
-test('loadTemplates --templates path wins over user + built-in, errors when missing', () => {
-  const prev = process.env.CCE_CONFIG_HOME;
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cce-tpl-'));
-  process.env.CCE_CONFIG_HOME = dir;
+test('offline mode reads the remote cache file; user templates.json overlays', withTempConfigHome(async () => {
+  const cfg = config.defaultConfig();
+  cfg.template.offline = true; // never hit the network
+  config.save(cfg);
+
+  fs.writeFileSync(templates.remoteCachePath(), JSON.stringify({
+    deepseek: { env: { ANTHROPIC_BASE_URL: 'https://ds' }, required: [] },
+    kimi: { env: {}, required: [] },
+  }));
+
+  let map = await templates.loadTemplates();
+  assert.ok(map.has('deepseek'));
+  assert.ok(map.has('kimi'));
+  assert.strictEqual(map.get('deepseek').env.ANTHROPIC_BASE_URL, 'https://ds');
+
+  // User file overrides 'deepseek' wholesale and adds 'mine'.
+  fs.writeFileSync(templates.userTemplatesPath(), JSON.stringify({
+    deepseek: { env: { ANTHROPIC_BASE_URL: 'https://custom' }, required: [] },
+    mine: { env: { ANTHROPIC_MODEL: 'z' }, required: [] },
+  }));
+  map = await templates.loadTemplates();
+  assert.strictEqual(map.get('deepseek').env.ANTHROPIC_BASE_URL, 'https://custom');
+  assert.ok(map.has('mine'));
+  assert.ok(map.has('kimi'));
+}));
+
+test('offline mode with no cache file throws a TemplateError', withTempConfigHome(async () => {
+  const cfg = config.defaultConfig();
+  cfg.template.offline = true;
+  config.save(cfg);
+  await assert.rejects(() => templates.loadTemplates(), templates.TemplateError);
+}));
+
+test('--from a file replaces the remote default (no network); missing/bad file errors', withTempConfigHome(async (dir) => {
+  const extra = path.join(dir, 'team.json');
+  fs.writeFileSync(extra, JSON.stringify({ deepseek: { env: { ANTHROPIC_BASE_URL: 'https://team' }, required: [] } }));
+
+  const map = await templates.loadTemplates({ from: extra });
+  assert.strictEqual(map.get('deepseek').env.ANTHROPIC_BASE_URL, 'https://team');
+
+  await assert.rejects(() => templates.loadTemplates({ from: path.join(dir, 'nope.json') }), templates.TemplateError);
+
+  const bad = path.join(dir, 'bad.json');
+  fs.writeFileSync(bad, '{ not json');
+  await assert.rejects(() => templates.loadTemplates({ from: bad }), templates.TemplateError);
+}));
+
+test('fetch success writes the remote cache + cache.json fetchedAt', withTempConfigHome(async () => {
+  const cache = require('../src/cache');
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    status: 200,
+    headers: { get: () => '"etag-1"' },
+    text: async () => JSON.stringify({ foo: { env: { ANTHROPIC_MODEL: 'm' }, required: [] } }),
+  });
   try {
-    const extra = path.join(dir, 'team.json');
-    fs.writeFileSync(extra, JSON.stringify({ deepseek: { env: { ANTHROPIC_BASE_URL: 'https://team' }, required: [] } }));
-
-    const merged = templates.loadTemplates({ extraPath: extra });
-    assert.strictEqual(merged.get('deepseek').env.ANTHROPIC_BASE_URL, 'https://team');
-
-    // Missing --templates file is a hard error.
-    assert.throws(
-      () => templates.loadTemplates({ extraPath: path.join(dir, 'nope.json') }),
-      templates.TemplateError
-    );
-
-    // Malformed JSON is a hard error too.
-    const bad = path.join(dir, 'bad.json');
-    fs.writeFileSync(bad, '{ not json');
-    assert.throws(() => templates.loadTemplates({ extraPath: bad }), templates.TemplateError);
+    const map = await templates.loadTemplates(); // no cache yet → fetches
+    assert.ok(map.has('foo'));
+    assert.ok(fs.existsSync(templates.remoteCachePath()));
+    const st = cache.readTemplate();
+    assert.ok(st.fetchedAt > 0);
+    assert.strictEqual(st.etag, '"etag-1"');
   } finally {
-    if (prev === undefined) delete process.env.CCE_CONFIG_HOME;
-    else process.env.CCE_CONFIG_HOME = prev;
-    fs.rmSync(dir, { recursive: true, force: true });
+    globalThis.fetch = realFetch;
   }
-});
+}));
 
 test('isValidEnvName matches the schema name rule', () => {
   assert.ok(config.isValidEnvName('deepseek'));

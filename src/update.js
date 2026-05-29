@@ -10,6 +10,7 @@ const path = require('path');
 const crossSpawn = require('cross-spawn');
 
 const config = require('./config');
+const cache = require('./cache');
 const log = require('./util/log');
 const { t } = require('./i18n');
 const pkg = require('../package.json');
@@ -28,50 +29,16 @@ const FETCH_TIMEOUT_MS = 4000;
 const AUTO_INSTALL_RETRY_MS = 60 * 60 * 1000; // 1 hour
 
 // ---------------------------------------------------------------------------
-// State file (~/.claude/cce/update-check.json)
+// State — the `update` section of the shared cache (~/.claude/cce/cache.json).
+// Thin wrappers over cache.js so callers/tests keep the old read/write API.
 // ---------------------------------------------------------------------------
 
-function getStatePath() {
-  return path.join(config.getConfigDir(), 'update-check.json');
-}
-
 function readState() {
-  const base = {
-    lastCheckAt: 0,
-    latestVersion: null,
-    skippedVersion: null,
-    autoUpdatePending: null,
-    autoUpdateAttemptedAt: 0,
-  };
-  try {
-    const parsed = JSON.parse(fs.readFileSync(getStatePath(), 'utf8'));
-    if (parsed && typeof parsed === 'object') {
-      if (typeof parsed.lastCheckAt === 'number') base.lastCheckAt = parsed.lastCheckAt;
-      if (typeof parsed.latestVersion === 'string') base.latestVersion = parsed.latestVersion;
-      if (typeof parsed.skippedVersion === 'string') base.skippedVersion = parsed.skippedVersion;
-      if (typeof parsed.autoUpdatePending === 'string') base.autoUpdatePending = parsed.autoUpdatePending;
-      if (typeof parsed.autoUpdateAttemptedAt === 'number') base.autoUpdateAttemptedAt = parsed.autoUpdateAttemptedAt;
-    }
-  } catch {
-    /* missing / unreadable / invalid — caller gets fresh defaults */
-  }
-  return base;
+  return cache.readUpdate();
 }
 
-// Shallow-merge `patch` into the current state and persist atomically.
-// Best-effort: any failure (read-only FS, etc.) is swallowed.
 function writeState(patch) {
-  const next = { ...readState(), ...patch };
-  try {
-    config.ensureConfigDir();
-    const file = getStatePath();
-    const tmp = file + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(next, null, 2) + '\n');
-    fs.renameSync(tmp, file);
-  } catch {
-    /* best effort */
-  }
-  return next;
+  return cache.writeUpdate(patch);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,7 +271,6 @@ module.exports = {
   PACKAGE_NAME,
   INSTALL_SPEC,
   CHECK_INTERVAL_MS,
-  getStatePath,
   readState,
   writeState,
   parseSemver,

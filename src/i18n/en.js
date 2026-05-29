@@ -126,10 +126,8 @@ module.exports = {
   'add.setDefaultPrompt': 'Set "{name}" as the default env? [y/N]',
   'add.launchHint': 'Launch it with `cce -e {name}`  (inspect with `cce show {name}`).',
   'add.templateNotFound': 'Template "{name}" not found. Available: {available}',
-  'add.noTemplates': 'No templates available. Add your own in {file}, or pass --templates <path>.',
-  'add.needTemplateArg': 'Picking a template needs a TTY. Pass a template name: `cce add <template>` (see `cce add --list`).',
+  'add.needTemplateArg': 'Picking a template needs a TTY. Pass a template name: `cce add <template>` (see `cce template ls`).',
   'add.needInteractiveFill': 'This template has fields to fill in, which needs a TTY. Run `cce add` interactively.',
-  'add.templatesNeedsPath': '--templates requires a file path',
   'add.unknownOption': 'Unknown option for `cce add`: {tok}',
   'add.fileParseFailed': 'Could not parse template file {file}: {message}',
   'add.fileNotFound': 'Template file not found: {file}',
@@ -137,7 +135,46 @@ module.exports = {
   'add.listTitle': 'Available templates:',
   'add.listSource': 'from: {file}',
   'add.listFields': 'fields: {names}',
-  'add.noTemplatesList': 'No templates available.',
+
+  // template command + remote source
+  'template.fromNeedsValue': '--from requires a path or URL',
+  'template.fromFetchFailed': 'Could not fetch templates from {src} ({reason}).',
+  'template.fromEmpty': 'No templates found in {src}.',
+  'template.usingStale': 'Could not refresh templates — using the cached copy (may be out of date).',
+  'template.offlineNoCache':
+    'Offline mode is on but there is no cached template file.\n' +
+    'On a machine with network, download:\n  {url}\n' +
+    'and save it to:\n  {path}',
+  'template.fetchFailed':
+    'Could not download templates ({reason}).\n' +
+    'Open this URL on a device with network access:\n  {url}\n' +
+    'then save the file to:\n  {path}\n' +
+    '(or set an intranet mirror with `cce template url <url>`).',
+  'template.none': 'No templates available. Source: {url}',
+  'template.unknownSub': 'Unknown `cce template` subcommand: {sub} (try: ls | show | refresh | url | offline)',
+  'template.statusTitle': 'Template source:',
+  'template.statusUrl': 'url     ',
+  'template.statusUrlDefault': '(default: jsDelivr + GitHub raw fallback)',
+  'template.statusOffline': 'offline ',
+  'template.statusCache': 'cache   ',
+  'template.statusCacheInfo': '{count} template(s), fetched {age} ago',
+  'template.statusCacheNone': 'none yet (will download on first `cce add`)',
+  'template.statusUnknown': 'unknown',
+  'template.statusHint': 'Manage with: cce template url <url|--none> · cce template offline on|off · cce template refresh',
+  'template.ageMinutes': '{n}m',
+  'template.ageHours': '{n}h',
+  'template.ageDays': '{n}d',
+  'template.showUsage': 'Usage: cce template show <name>',
+  'template.showHeader': 'Template: {name}',
+  'template.showRequired': 'Required fields (you fill these in):',
+  'template.showFooter': 'Create an env from it with `cce add {name}`.',
+  'template.refreshing': 'Refreshing templates…',
+  'template.refreshed': 'Templates refreshed ({count} available).',
+  'template.urlCleared': 'Template URL cleared — using the default sources.',
+  'template.urlInvalid': 'Not a valid URL: "{val}" (must start with http:// or https://). Use `cce template url --none` to reset.',
+  'template.urlSet': 'Template URL set to {url}',
+  'template.offlineSet': 'Template offline mode: {state}',
+  'template.offlineInvalid': 'Invalid value "{val}". Use: cce template offline on|off',
 
   // remove
   'remove.unknownOption': 'Unknown option for `cce remove`: {tok}',

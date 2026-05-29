@@ -778,3 +778,55 @@ cce 发布在 npm（`@xiaofuzhou/cce`），所谓「更新」本质就是**查 n
 - `src/i18n/index.js` 导出 `localize`；`src/config.js` 加 `ENV_NAME_RE` / `isValidEnvName`。
 - `parser.js` / `cli.js` 注册 `add`；`help.js`、`completion.js`（补模板名 + `--list`/`--templates`，新增内部 `completion --templates` 发射器）、`en.js`/`zh-CN.js`（新增 `add.*` 键）同步。
 - 测试 `test/templates.test.js`：`localize` 回退、模板规范化、`buildEnvFromTemplate`、来源覆盖合并、缺文件 / 坏 JSON 报错、名字校验。
+
+> **后续变更**：§15.2 的「内置随包发布」与 `--templates` 入口已在 v0.6 被远端模板方案取代；
+> `cce remove` 已在 v0.5 实现（带二次确认）。当前设计见 §16。
+
+---
+
+## 16. 远端模板 + `cce template`（v0.6）
+
+### 16.1 动机
+
+默认模板若随 npm 包发布，更新就被「冻」在版本里 —— 改个模型名要发版、用户要升级才拿得到。
+把默认模板挪到 GitHub 仓库实时获取 + 本地缓存，用户总能拿到最新的，且改模板不必发版。
+
+### 16.2 关键取舍
+
+| 决策 | 选择 | 理由 |
+|---|---|---|
+| 是否保留随包 bundle | **不保留**（用户拍板） | 跑过 `npm i -g` 说明有网；离线/失败时打印链接让用户手动下，比冻结的 bundle 更可控 |
+| 默认源 | jsDelivr 主 + GitHub raw 兜底 | jsDelivr 国内可达；raw 常被墙，仅兜底 |
+| 源文件位置 | 仓库根 `templates/builtin.json`（移出 `src/`，不打进包） | 与代码解耦；`files` 只含 `src/`，天然不随包发布 |
+| TTL | 24h，按 `cache.json` 的 `fetchedAt` 算 | 不靠文件 mtime（会被备份/同步/拷贝改写，不可靠） |
+| 缓存文件 | 内容存 `templates.remote.json`（与远端同构），元数据存 `cache.json` | 同构 → 下载失败可把 URL 内容原样存到该路径，无需 import 命令 |
+| 统一缓存 | 删 `update-check.json`，所有机器态走 `cache.json`（`update` / `template` 两段） | 一个缓存文件，旧文件留作孤儿（用户少，影响小） |
+| 一次性来源 | `cce add --from <path\|url>`（取代 `--templates`），`^https?://` 判 URL 否则路径 | 一个入口同时支持本地/远程；不写缓存、不改配置 |
+| 内网/离线 | `config.template.url`（单镜像，不兜底）+ `config.template.offline`（永不联网、跳过 TTL） | 两条路：有镜像配 url；没有就手放缓存 + offline |
+
+### 16.3 加载链
+
+```
+默认层：--from 指定的来源  或  远端/缓存 templates.remote.json
+  └─ 叠加 ~/.claude/cce/templates.json（用户文件）
+最终为空 → 按上下文报错（offline 无缓存 / fetch 失败 / --from 空）并打印 URL + 应存路径
+```
+
+远端层逻辑：`offline` → 只读缓存、不联网、不看 TTL；否则缓存新鲜（`now-fetchedAt<24h`）用缓存，过期/无则拉
+（`config.template.url` 设了只用它，否则 jsDelivr→raw）。拉成功写缓存 + 带 `etag` 写 `cache.json`（下次发
+`If-None-Match`，304 只刷新 `fetchedAt`）；全失败则回落旧缓存（打 warn）或报错。
+
+### 16.4 子命令 `cce template`（别名 `tpl`）
+
+裸 `cce template` 出状态总览（url / offline / 缓存数 + 年龄，**不联网**）；`ls`/`list` 列模板（取代 `cce add --list`）；
+`show <名>` 看单模板 env + 待填项；`refresh` 强制拉（忽略 TTL + offline）；`url [<url>|--none]` 与 `offline [on|off]`
+读/写 `config.template`。**补全取模板名（`completion --templates`）走 cache-only（`allowFetch:false`），永不联网、永不报错。**
+
+### 16.5 新增 / 改动
+
+- 新增 `src/cache.js`（统一 `cache.json`）、`src/commands/template.js`；移动 `src/templates.builtin.json` → `templates/builtin.json`。
+- 重写 `src/templates.js`：远端拉取 + 缓存 + `--from` + 离线 + 上下文化报错；`loadTemplates` 变为 **async**。
+- `src/update.js` 的 `readState`/`writeState` 改为 `cache.js` 的 `readUpdate`/`writeUpdate` 薄封装。
+- `src/config.js` + `schema.json` 加 `template { url, offline }`；`src/commands/add.js` 把 `--templates`→`--from`、删 `--list`/`runList`。
+- `parser.js`/`cli.js` 注册 `template`/`tpl`（dispatch 改 async）；`completion.js` 四端补 `template` 子命令 + `--from`；`help.js`、i18n（`template.*` 键，删 `add.list*`/`add.noTemplates*`/`add.templatesNeedsPath`）同步。
+- 测试：重写 `test/templates.test.js`（离线缓存 + 用户叠加、`--from`、stub fetch 写缓存），新增 `test/cache.test.js`。
