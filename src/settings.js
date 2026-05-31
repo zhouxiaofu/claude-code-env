@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const config = require('./config');
 const log = require('./util/log');
 const { expandEnvVars } = require('./util/expand');
+const { parseJson } = require('./util/json');
 const { t } = require('./i18n');
 
 const { KNOWN_ANTHROPIC_VARS } = config;
@@ -31,7 +32,7 @@ function readUserEnv() {
     return {}; // not existing is normal, no warning
   }
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = parseJson(raw);
     if (parsed && typeof parsed.env === 'object' && parsed.env) {
       return parsed.env;
     }

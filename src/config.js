@@ -5,6 +5,7 @@ const path = require('path');
 const os = require('os');
 
 const { t } = require('./i18n');
+const { parseJson } = require('./util/json');
 
 const CONFIG_VERSION = 1;
 
@@ -97,7 +98,7 @@ function load() {
   }
   let parsed;
   try {
-    parsed = JSON.parse(raw);
+    parsed = parseJson(raw);
   } catch (e) {
     const bak = file + '.bak.' + Date.now();
     fs.writeFileSync(bak, raw);
@@ -154,7 +155,7 @@ function normalize(cfg) {
 function peekLang() {
   try {
     const raw = fs.readFileSync(getConfigPath(), 'utf8');
-    const parsed = JSON.parse(raw);
+    const parsed = parseJson(raw);
     if (parsed && typeof parsed.lang === 'string' && parsed.lang) {
       return parsed.lang;
     }
