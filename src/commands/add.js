@@ -108,6 +108,7 @@ async function run(args) {
   };
   config.save(cfg);
   log.success(t('add.created', { name }));
+  if (template.docs) log.info(t('add.docsHint', { url: template.docs }));
 
   // 5) Offer to make it the default (interactive only).
   if (isInteractive()) {

@@ -59,7 +59,7 @@ const SUB = ['list', 'ls', 'add', 'remove', 'rm', 'template', 'tpl', 'show', 'ed
 const TOP_FLAGS = ['-e', '--env', '-a', '-A', '-m', '--merge-mode', '-h', '--help', '-v', '--version'];
 const MERGE_MODES = ['override', 'cce', 'claude'];
 const LANGS = ['en', 'zh-CN', 'auto'];
-const TEMPLATE_SUB = ['ls', 'list', 'show', 'refresh', 'url', 'offline'];
+const TEMPLATE_SUB = ['ls', 'list', 'show', 'docs', 'refresh', 'url', 'offline'];
 
 function bashScript() {
   return `# cce bash completion — install with: cce completion bash >> ~/.bashrc
@@ -197,7 +197,7 @@ complete -c cce -n '__fish_seen_subcommand_from completion' -a 'bash zsh powersh
 complete -c cce -n '__fish_seen_subcommand_from lang' -a 'en zh-CN auto'
 complete -c cce -n '__fish_seen_subcommand_from update' -a '--check'
 complete -c cce -n '__fish_seen_subcommand_from add' -a '(__cce_templates) --from'
-complete -c cce -n '__fish_seen_subcommand_from template tpl' -a 'ls list show refresh url offline'
+complete -c cce -n '__fish_seen_subcommand_from template tpl' -a 'ls list show docs refresh url offline'
 
 # -e/--env arg completion at any position before pass-through
 complete -c cce -s e -l env -a '(__cce_envs)' -d 'Use an env'
@@ -269,7 +269,7 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
     }
 
     if ($prev -in @('template','tpl')) {
-        @('ls','list','show','refresh','url','offline') | Where-Object { $_ -like "$wordToComplete*" } |
+        @('ls','list','show','docs','refresh','url','offline') | Where-Object { $_ -like "$wordToComplete*" } |
             ForEach-Object { [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_) }
         return
     }

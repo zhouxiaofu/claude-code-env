@@ -4,6 +4,7 @@
       "en": "DeepSeek (Claude-compatible API)",
       "zh-CN": "DeepSeek（兼容 Claude 接口）"
     },
+    "docs": "https://api-docs.deepseek.com/zh-cn/quick_start/agent_integrations/claude_code",
     "env": {
       "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
       "ANTHROPIC_MODEL": "deepseek-v4-pro",
@@ -28,6 +29,7 @@
       "en": "Moonshot Kimi K2.5 (Claude-compatible API)",
       "zh-CN": "月之暗面 Kimi K2.5（兼容 Claude 接口）"
     },
+    "docs": "https://platform.kimi.com/docs/guide/agent-support#%E9%85%8D%E7%BD%AE%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F",
     "env": {
       "ANTHROPIC_BASE_URL": "https://api.moonshot.cn/anthropic",
       "ANTHROPIC_MODEL": "kimi-k2.5",
@@ -47,13 +49,63 @@
       }
     ]
   },
+  "mimo": {
+    "description": {
+      "en": "Xiaomi MiMo — pay-as-you-go API (Claude-compatible)",
+      "zh-CN": "小米 MiMo 按量付费 API（兼容 Claude 接口）"
+    },
+    "docs": "https://mimo.mi.com/docs/zh-CN/tokenplan/integration/claudecode",
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://api.xiaomimimo.com/anthropic",
+      "ANTHROPIC_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "mimo-v2.5-pro[1m]"
+    },
+    "required": [
+      {
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": {
+          "en": "Your Xiaomi MiMo API Key (sk-xxxxx, from xiaomimimo.com)",
+          "zh-CN": "你的小米 MiMo API Key（sk-xxxxx 格式，xiaomimimo.com 获取）"
+        }
+      }
+    ]
+  },
+  "mimo-tp": {
+    "description": {
+      "en": "Xiaomi MiMo — Token Plan subscription (Claude-compatible)",
+      "zh-CN": "小米 MiMo Token Plan 订阅套餐（兼容 Claude 接口）"
+    },
+    "docs": "https://mimo.mi.com/docs/zh-CN/tokenplan/integration/claudecode",
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://token-plan-cn.xiaomimimo.com/anthropic",
+      "ANTHROPIC_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "mimo-v2.5-pro[1m]"
+    },
+    "required": [
+      {
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": {
+          "en": "Your Xiaomi MiMo Token Plan API Key (tp-xxxxx, from xiaomimimo.com)",
+          "zh-CN": "你的小米 MiMo Token Plan API Key（tp-xxxxx 格式，xiaomimimo.com 获取）"
+        }
+      }
+    ]
+  },
   "glm": {
     "description": {
       "en": "Zhipu GLM (Claude-compatible API)",
       "zh-CN": "智谱 GLM（兼容 Claude 接口）"
     },
+    "docs": "https://docs.bigmodel.cn/cn/coding-plan/tool/claude",
     "env": {
       "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.1",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5-turbo",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air",
       "API_TIMEOUT_MS": "3000000",
       "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
     },

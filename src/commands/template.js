@@ -6,6 +6,8 @@ const config = require('../config');
 const cache = require('../cache');
 const tpl = require('../templates');
 const { maskEnvObject } = require('../util/mask');
+const { openUrl } = require('../util/open');
+const { pick } = require('../util/picker');
 const log = require('../util/log');
 const i18n = require('../i18n');
 const { t, localize } = i18n;
@@ -33,7 +35,7 @@ function extractFrom(args) {
   return { from, rest };
 }
 
-// `cce template [ls|list|show|refresh|url|offline] ...`
+// `cce template [ls|list|show|docs|refresh|url|offline] ...`
 async function run(args) {
   const sub = args[0];
   const rest = args.slice(1);
@@ -44,6 +46,8 @@ async function run(args) {
       case 'ls':
       case 'list':              return await listTemplates(rest);
       case 'show':              return await showTemplate(rest);
+      case 'docs':
+      case 'doc':               return await docsCmd(rest);
       case 'refresh':           return await refresh();
       case 'url':               return urlCmd(rest);
       case 'offline':           return offlineCmd(rest);
@@ -150,8 +154,72 @@ async function showTemplate(args) {
       log.plain(`  ${pc.cyan(it.name)}${def}${d ? '  ' + pc.dim(d) : ''}`);
     }
   }
+  if (tp.docs) {
+    log.plain('');
+    log.plain(`${t('template.showDocs')}  ${pc.cyan(tp.docs)}`);
+  }
   log.plain('');
   log.plain(pc.dim(t('template.showFooter', { name })));
+  return 0;
+}
+
+// `cce template docs [name] [--print] [--from <src>]` — open the template's
+// official docs page in the default browser (or just print the URL).
+async function docsCmd(args) {
+  const { from, rest } = extractFrom(args);
+  const print = rest.includes('--print') || rest.includes('-p');
+  const positionals = rest.filter((a) => a !== '--print' && a !== '-p');
+  let name = positionals[0];
+
+  const templates = await tpl.loadTemplates({ from });
+
+  if (!name) {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      log.error(t('template.docsUsage'));
+      return 1;
+    }
+    const items = [...templates.values()]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((tp) => ({
+        value: tp.name,
+        label: tp.name,
+        hint: tp.docs ? localize(tp.description) : t('template.docsNoneHint'),
+      }));
+    name = await pick({ title: t('template.docsPickTitle'), items });
+    if (name === null) {
+      log.warn(t('cli.cancelled'));
+      return 130;
+    }
+  }
+
+  const tp = templates.get(name);
+  if (!tp) {
+    log.error(t('add.templateNotFound', { name, available: [...templates.keys()].sort().join(', ') }));
+    return 1;
+  }
+  if (!tp.docs) {
+    log.error(t('template.docsNone', { name }));
+    return 1;
+  }
+  // Remote templates are untrusted input — only ever hand http(s) to the OS.
+  if (!tpl.isUrl(tp.docs)) {
+    log.error(t('template.docsInvalid', { name, url: tp.docs }));
+    return 1;
+  }
+
+  if (print) {
+    log.plain(tp.docs);
+    return 0;
+  }
+
+  if (await openUrl(tp.docs)) {
+    log.success(t('template.docsOpened', { url: tp.docs }));
+  } else {
+    // No browser to hand off to (headless box, missing opener) — the URL
+    // itself is still the answer, so this is a soft failure.
+    log.warn(t('template.docsOpenFailed'));
+    log.plain(tp.docs);
+  }
   return 0;
 }
 

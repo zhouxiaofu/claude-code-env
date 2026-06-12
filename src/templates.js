@@ -89,7 +89,14 @@ function normalizeTemplate(name, raw, source) {
     }
   }
 
-  return { name, description: raw.description ?? null, env, required, source };
+  return {
+    name,
+    description: raw.description ?? null,
+    docs: typeof raw.docs === 'string' ? raw.docs : null,
+    env,
+    required,
+    source,
+  };
 }
 
 // --- remote fetch ----------------------------------------------------------
