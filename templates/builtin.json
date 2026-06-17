@@ -95,19 +95,20 @@
       }
     ]
   },
-  "glm": {
+  "glm5.2": {
     "description": {
-      "en": "Zhipu GLM (Claude-compatible API)",
-      "zh-CN": "智谱 GLM（兼容 Claude 接口）"
+      "en": "Zhipu GLM-5.2 (Claude-compatible API)",
+      "zh-CN": "智谱 GLM-5.2（兼容 Claude 接口）"
     },
     "docs": "https://docs.bigmodel.cn/cn/coding-plan/tool/claude",
     "env": {
       "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
-      "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.1",
-      "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5-turbo",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]",
       "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air",
       "API_TIMEOUT_MS": "3000000",
-      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+      "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
     },
     "required": [
       {

@@ -31,7 +31,7 @@ npm install -g @xiaofuzhou/cce   # 要求 Node ≥ 18，claude 在 PATH 中
 cce add            # 弹出模板菜单，选择对应的配置（以 DeepSeek 为例）：
                    #   › deepseek  DeepSeek（兼容 Claude 接口）
                    #     kimi      月之暗面 Kimi K2.5
-                   #     glm       智谱 GLM
+                   #     glm5.2    智谱 GLM-5.2
                    #     mimo      小米 MiMo 按量付费 API
                    #     mimo-tp   小米 MiMo Token Plan 订阅套餐
                    # 然后粘贴你的 API Key（platform.deepseek.com 获取），其余全部预置

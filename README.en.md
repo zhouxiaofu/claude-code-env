@@ -31,7 +31,7 @@ npm install -g @xiaofuzhou/cce   # requires Node ≥ 18, `claude` on PATH
 cce add            # pick a template from the menu (DeepSeek as an example):
                    #   › deepseek  DeepSeek (Claude-compatible API)
                    #     kimi      Moonshot Kimi K2.5
-                   #     glm       Zhipu GLM
+                   #     glm5.2    Zhipu GLM-5.2
                    #     mimo      Xiaomi MiMo pay-as-you-go API
                    #     mimo-tp   Xiaomi MiMo Token Plan subscription
                    # then paste your API key (from platform.deepseek.com) — everything else is preset
