@@ -46,8 +46,11 @@ cce                # 启动 Claude Code，已经跑在 DeepSeek 上
 {
   "version": 1,
   "default": "deepseek",
+  // 想每次都跳过 Claude Code 的权限确认？加上这行（全局生效，所有 env 都带）：
+  "args": "--permission-mode bypassPermissions",
   "envs": {
     "deepseek": {
+      // 也可以只给某个 env 单独加 args（覆盖/追加全局，见下方说明）
       "env": {
         "ANTHROPIC_BASE_URL":   "https://api.deepseek.com/anthropic",
         "ANTHROPIC_AUTH_TOKEN": "sk-xxxxxxxxxxxx",
@@ -57,6 +60,8 @@ cce                # 启动 Claude Code，已经跑在 DeepSeek 上
   }
 }
 ```
+
+> `args` 里是传给 `claude` 的默认参数，常用的是 `--permission-mode bypassPermissions`（跳过权限确认）。配在顶层＝对所有 env 生效；配在某个 env 里＝只对它生效。启动时还能用 `cce -e deepseek -a "..."` 临时追加。
 
 ---
 

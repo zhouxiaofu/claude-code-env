@@ -46,8 +46,12 @@ Prefer doing it by hand? `cce edit` opens the config file (`~/.claude/cce/config
 {
   "version": 1,
   "default": "deepseek",
+  // Want to skip Claude Code's permission prompts every time? Add this line
+  // (global — applies to every env):
+  "args": "--permission-mode bypassPermissions",
   "envs": {
     "deepseek": {
+      // Or set args on a single env to override/extend the global one
       "env": {
         "ANTHROPIC_BASE_URL":   "https://api.deepseek.com/anthropic",
         "ANTHROPIC_AUTH_TOKEN": "sk-xxxxxxxxxxxx",
@@ -57,6 +61,8 @@ Prefer doing it by hand? `cce edit` opens the config file (`~/.claude/cce/config
   }
 }
 ```
+
+> `args` holds default flags passed to `claude` — the common one is `--permission-mode bypassPermissions` (skip permission prompts). At the top level it applies to every env; inside an env it applies to just that one. You can also append at launch with `cce -e deepseek -a "..."`.
 
 ---
 
