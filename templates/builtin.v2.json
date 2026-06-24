@@ -116,20 +116,20 @@
       }
     ]
   },
-  "glm5.2": {
+  "glm": {
     "description": {
-      "en": "Zhipu GLM-5.2 (Claude-compatible API)",
-      "zh-CN": "智谱 GLM-5.2（兼容 Claude 接口）"
+      "en": "Zhipu GLM (Claude-compatible API)",
+      "zh-CN": "智谱 GLM（兼容 Claude 接口）"
     },
     "docs": "https://docs.bigmodel.cn/cn/coding-plan/tool/claude",
+    "name": "glm-${model}",
     "env": {
       "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
-      "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]",
-      "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "${opus}",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "${sonnet}",
       "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air",
       "API_TIMEOUT_MS": "3000000",
-      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-      "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
     },
     "inputs": [
       {
@@ -139,6 +139,34 @@
           "en": "Your Zhipu API Key (from https://z.ai/manage-apikey/apikey-list)",
           "zh-CN": "你的智谱 API Key（https://bigmodel.cn/apikey/platform 获取）"
         }
+      },
+      {
+        "type": "select",
+        "name": "model",
+        "description": { "en": "Model", "zh-CN": "模型" },
+        "options": [
+          {
+            "name": "5.2",
+            "label": { "en": "GLM-5.2", "zh-CN": "GLM-5.2" },
+            "inputs": [
+              {
+                "type": "const",
+                "vars": { "opus": "glm-5.2[1m]", "sonnet": "glm-5.2[1m]" },
+                "env": { "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000" }
+              }
+            ]
+          },
+          {
+            "name": "5.1",
+            "label": { "en": "GLM-5.1", "zh-CN": "GLM-5.1" },
+            "inputs": [
+              {
+                "type": "const",
+                "vars": { "opus": "glm-5.1", "sonnet": "glm-5-turbo" }
+              }
+            ]
+          }
+        ]
       }
     ]
   }
