@@ -6,18 +6,30 @@ const path = require('path');
 const config = require('./config');
 const cache = require('./cache');
 const log = require('./util/log');
+const expr = require('./util/expr');
 const { t } = require('./i18n');
+
+// The template-schema version this cce understands. The remote source URL
+// embeds it (`builtin.v${version}.json`) so each cce binary only ever fetches
+// the format it can parse; bumping this + publishing a new file is the entire
+// upgrade path. Old (pre-versioned-URL) clients keep fetching builtin.json.
+const TEMPLATE_SCHEMA_VERSION = 2;
+
+// Official variables allowed inside a source URL (default or user mirror).
+// Extend by adding keys here; anything else in a `${...}` is rejected.
+const URL_VARS = { version: String(TEMPLATE_SCHEMA_VERSION) };
 
 // Default remote sources for the builtin template file, tried in order. The
 // file is served straight from the GitHub repo via jsDelivr (CDN, China-
 // friendly) with raw.githubusercontent.com as a fallback. A user-set
-// config.template.url overrides BOTH (single source, no fallback).
+// config.template.url overrides BOTH (single source, no fallback). `${version}`
+// is substituted before fetching (see substituteUrlVars).
 const REMOTE_SOURCES = [
-  'https://cdn.jsdelivr.net/gh/zhouxiaofu/claude-code-env@main/templates/builtin.json',
-  'https://raw.githubusercontent.com/zhouxiaofu/claude-code-env/main/templates/builtin.json',
+  'https://cdn.jsdelivr.net/gh/zhouxiaofu/claude-code-env@main/templates/builtin.v${version}.json',
+  'https://raw.githubusercontent.com/zhouxiaofu/claude-code-env/main/templates/builtin.v${version}.json',
 ];
 
-const TTL_MS = 24 * 60 * 60 * 1000; // 24h — refetch the default templates at most once a day
+const TTL_MS = 3 * 60 * 60 * 1000; // 3h — refetch the default templates at most once every 3 hours
 const FETCH_TIMEOUT_MS = 5000;
 
 // Raised for user-facing template problems (network failure with no cache,
@@ -46,10 +58,28 @@ function isUrl(s) {
   return typeof s === 'string' && /^https?:\/\//i.test(s);
 }
 
+// Resolve `${var}` in a source URL against the official URL_VARS (currently just
+// version). Reuses the template expression engine in strict mode, so an unknown
+// `${foo}` throws — that's the validation for `cce template url`. A URL with no
+// `${...}` passes through unchanged.
+function substituteUrlVars(url) {
+  if (typeof url !== 'string') return url;
+  try {
+    return expr.render(url, URL_VARS, { strict: true });
+  } catch (e) {
+    throw new TemplateError(t('template.urlBadVar', { url, reason: e.message }));
+  }
+}
+
 // The URL we point users at in error/help messages (their override, or the
-// primary default).
+// primary default), with `${version}` resolved.
 function displayUrl(cfg) {
-  return (cfg && cfg.template && cfg.template.url) || REMOTE_SOURCES[0];
+  const raw = (cfg && cfg.template && cfg.template.url) || REMOTE_SOURCES[0];
+  try {
+    return substituteUrlVars(raw);
+  } catch {
+    return raw;
+  }
 }
 
 function readJson(file) {
@@ -65,36 +95,81 @@ function writeFileAtomic(file, content) {
   fs.renameSync(tmp, file);
 }
 
+// Keep only the string-valued keys of an object (env / const.vars / const.env).
+function stringMap(obj) {
+  const out = {};
+  if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof v === 'string') out[k] = v;
+    }
+  }
+  return out;
+}
+
+// Normalize one input node, or null to drop it (tolerant — a malformed node
+// must not sink the whole template). type defaults to 'env'.
+function normalizeInput(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const type = typeof raw.type === 'string' ? raw.type : 'env';
+
+  if (type === 'env' || type === 'var') {
+    if (typeof raw.name !== 'string' || raw.name === '') return null;
+    const node = { type, name: raw.name, description: raw.description ?? null };
+    if (typeof raw.default === 'string') node.default = raw.default;
+    if (type === 'env' && typeof raw.value === 'string') node.value = raw.value;
+    return node;
+  }
+  if (type === 'const') {
+    return { type, vars: stringMap(raw.vars), env: stringMap(raw.env) };
+  }
+  if (type === 'select') {
+    const options = [];
+    if (Array.isArray(raw.options)) {
+      for (const o of raw.options) {
+        const opt = normalizeOption(o);
+        if (opt) options.push(opt);
+      }
+    }
+    if (options.length === 0) return null;
+    return {
+      type,
+      name: typeof raw.name === 'string' && raw.name !== '' ? raw.name : null,
+      description: raw.description ?? null,
+      options,
+    };
+  }
+  return null;
+}
+
+function normalizeOption(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (typeof raw.name !== 'string' || raw.name === '') return null;
+  return { name: raw.name, label: raw.label ?? null, inputs: normalizeInputs(raw.inputs) };
+}
+
+function normalizeInputs(arr) {
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const n of arr) {
+    const node = normalizeInput(n);
+    if (node) out.push(node);
+  }
+  return out;
+}
+
 // Coerce one raw template entry into the shape the command layer relies on.
-// Tolerant: drops non-string env values and malformed required items rather
-// than throwing, so one bad field doesn't sink the whole file.
+// Tolerant: drops non-string env values and malformed input nodes rather than
+// throwing, so one bad field doesn't sink the whole file.
 function normalizeTemplate(name, raw, source) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-
-  const env = {};
-  if (raw.env && typeof raw.env === 'object' && !Array.isArray(raw.env)) {
-    for (const [k, v] of Object.entries(raw.env)) {
-      if (typeof v === 'string') env[k] = v;
-    }
-  }
-
-  const required = [];
-  if (Array.isArray(raw.required)) {
-    for (const it of raw.required) {
-      if (!it || typeof it !== 'object') continue;
-      if (typeof it.name !== 'string' || it.name === '') continue;
-      const item = { name: it.name, description: it.description ?? null };
-      if (typeof it.default === 'string') item.default = it.default;
-      required.push(item);
-    }
-  }
 
   return {
     name,
     description: raw.description ?? null,
     docs: typeof raw.docs === 'string' ? raw.docs : null,
-    env,
-    required,
+    nameExpr: typeof raw.name === 'string' ? raw.name : null,
+    env: stringMap(raw.env),
+    inputs: normalizeInputs(raw.inputs),
     source,
   };
 }
@@ -143,9 +218,16 @@ async function ensureRemoteCache({ cfg, refresh = false }) {
     return { attempted: false, fetchFailed: false, usedStale: false, hasFile };
   }
 
-  const urls = cfg.template && cfg.template.url ? [cfg.template.url] : REMOTE_SOURCES;
+  const rawUrls = cfg.template && cfg.template.url ? [cfg.template.url] : REMOTE_SOURCES;
   let lastErr = null;
-  for (const url of urls) {
+  for (const rawUrl of rawUrls) {
+    let url;
+    try {
+      url = substituteUrlVars(rawUrl); // resolve ${version}; cache/etag key off the resolved URL
+    } catch {
+      lastErr = 'url-vars';
+      continue;
+    }
     const etag = url === st.sourceUrl ? st.etag : null;
     const r = await fetchRemote(url, etag);
     if (r.notModified) {
@@ -188,7 +270,7 @@ function addAll(map, data, source) {
 // written to the cache. Throws TemplateError on any problem.
 async function loadFromSource(from) {
   if (isUrl(from)) {
-    const r = await fetchRemote(from, null);
+    const r = await fetchRemote(substituteUrlVars(from), null);
     if (!r.ok) throw new TemplateError(t('template.fromFetchFailed', { src: from, reason: r.error || 'network' }));
     let parsed;
     try {
@@ -286,30 +368,19 @@ function emptyError(ctx, { from, cfg }) {
   return new TemplateError(t('template.none', { url: displayUrl(cfg) }));
 }
 
-// Pure: assemble the final env to store, merging the user's answers (keyed by
-// required-field name) over the template's fixed env. Answers win on collision.
-function buildEnvFromTemplate(tpl, answers) {
-  const env = { ...tpl.env };
-  for (const item of tpl.required) {
-    if (Object.prototype.hasOwnProperty.call(answers, item.name)) {
-      env[item.name] = answers[item.name];
-    }
-  }
-  return env;
-}
-
 module.exports = {
   REMOTE_SOURCES,
   TTL_MS,
+  TEMPLATE_SCHEMA_VERSION,
   TemplateError,
   userTemplatesPath,
   remoteCachePath,
   displayUrl,
   isUrl,
+  substituteUrlVars,
   normalizeTemplate,
   fetchRemote,
   ensureRemoteCache,
   loadTemplates,
   loadFromSource,
-  buildEnvFromTemplate,
 };

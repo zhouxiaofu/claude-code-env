@@ -1,0 +1,145 @@
+{
+  "deepseek": {
+    "description": {
+      "en": "DeepSeek (Claude-compatible API)",
+      "zh-CN": "DeepSeek（兼容 Claude 接口）"
+    },
+    "docs": "https://api-docs.deepseek.com/zh-cn/quick_start/agent_integrations/claude_code",
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://api.deepseek.com/anthropic",
+      "ANTHROPIC_MODEL": "deepseek-v4-pro",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "deepseek-v4-pro",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "deepseek-v4-pro",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "deepseek-v4-flash",
+      "CLAUDE_CODE_SUBAGENT_MODEL": "deepseek-v4-flash",
+      "CLAUDE_CODE_EFFORT_LEVEL": "max"
+    },
+    "inputs": [
+      {
+        "type": "env",
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": {
+          "en": "Your DeepSeek API Key (from https://platform.deepseek.com/api_keys)",
+          "zh-CN": "你的 DeepSeek API Key（https://platform.deepseek.com/api_keys 获取）"
+        }
+      }
+    ]
+  },
+  "kimi": {
+    "description": {
+      "en": "Kimi (Claude-compatible API)",
+      "zh-CN": "Kimi（兼容 Claude 接口）"
+    },
+    "docs": "https://platform.kimi.com/docs/guide/agent-support#%E9%85%8D%E7%BD%AE%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F",
+    "name": "${model}",
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://api.moonshot.cn/anthropic",
+      "ANTHROPIC_MODEL": "${model}",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "${model}",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "${model}",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "${model}",
+      "CLAUDE_CODE_SUBAGENT_MODEL": "${model}",
+      "ENABLE_TOOL_SEARCH": "false",
+      "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "262144"
+    },
+    "inputs": [
+      {
+        "type": "env",
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": {
+          "en": "Your Kimi API Key (from https://platform.kimi.com/console/api-keys)",
+          "zh-CN": "你的 Kimi API Key（https://platform.kimi.com/console/api-keys 获取）"
+        }
+      },
+      {
+        "type": "select",
+        "name": "model",
+        "description": { "en": "Model", "zh-CN": "模型" },
+        "options": [
+          { "name": "kimi-k2.7-code", "label": { "en": "Kimi K2.7 Code", "zh-CN": "Kimi K2.7 Code" } },
+          { "name": "kimi-k2.6", "label": { "en": "Kimi K2.6", "zh-CN": "Kimi K2.6" } }
+        ]
+      }
+    ]
+  },
+  "mimo": {
+    "description": {
+      "en": "Xiaomi MiMo (Claude-compatible API)",
+      "zh-CN": "小米 MiMo（兼容 Claude 接口）"
+    },
+    "docs": "https://mimo.mi.com/docs/zh-CN/tokenplan/integration/claudecode",
+    "name": "mimo-${plan}",
+    "env": {
+      "ANTHROPIC_BASE_URL": "${baseUrl}",
+      "ANTHROPIC_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "mimo-v2.5-pro[1m]",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "mimo-v2.5-pro[1m]"
+    },
+    "inputs": [
+      {
+        "type": "select",
+        "name": "plan",
+        "description": { "en": "Plan", "zh-CN": "套餐" },
+        "options": [
+          {
+            "name": "payg",
+            "label": { "en": "Pay-as-you-go (sk-…)", "zh-CN": "按量付费（sk-…）" },
+            "inputs": [
+              { "type": "const", "vars": { "baseUrl": "https://api.xiaomimimo.com/anthropic" } },
+              {
+                "type": "env",
+                "name": "ANTHROPIC_AUTH_TOKEN",
+                "description": {
+                  "en": "Your Xiaomi MiMo API Key (sk-xxxxx, from https://platform.xiaomimimo.com/console/api-keys)",
+                  "zh-CN": "你的小米 MiMo API Key（sk-xxxxx，https://platform.xiaomimimo.com/console/api-keys 获取）"
+                }
+              }
+            ]
+          },
+          {
+            "name": "tp",
+            "label": { "en": "Token Plan subscription (tp-…)", "zh-CN": "Token Plan 订阅（tp-…）" },
+            "inputs": [
+              { "type": "const", "vars": { "baseUrl": "https://token-plan-cn.xiaomimimo.com/anthropic" } },
+              {
+                "type": "env",
+                "name": "ANTHROPIC_AUTH_TOKEN",
+                "description": {
+                  "en": "Your Xiaomi MiMo Token Plan API Key (tp-xxxxx, from https://platform.xiaomimimo.com/console/plan-manage)",
+                  "zh-CN": "你的小米 MiMo Token Plan API Key（tp-xxxxx，https://platform.xiaomimimo.com/console/plan-manage 获取）"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "glm5.2": {
+    "description": {
+      "en": "Zhipu GLM-5.2 (Claude-compatible API)",
+      "zh-CN": "智谱 GLM-5.2（兼容 Claude 接口）"
+    },
+    "docs": "https://docs.bigmodel.cn/cn/coding-plan/tool/claude",
+    "env": {
+      "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.2[1m]",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.2[1m]",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.5-air",
+      "API_TIMEOUT_MS": "3000000",
+      "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+      "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"
+    },
+    "inputs": [
+      {
+        "type": "env",
+        "name": "ANTHROPIC_AUTH_TOKEN",
+        "description": {
+          "en": "Your Zhipu API Key (from https://z.ai/manage-apikey/apikey-list)",
+          "zh-CN": "你的智谱 API Key（https://bigmodel.cn/apikey/platform 获取）"
+        }
+      }
+    ]
+  }
+}

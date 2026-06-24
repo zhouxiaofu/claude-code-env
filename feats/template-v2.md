@@ -277,13 +277,14 @@ cce add mimo --set plan=tp --set model=pro-1m --set ANTHROPIC_AUTH_TOKEN=tp-xxxx
 
 ### 9.2 官方变量（白名单）
 
-URL 里**只允许使用官方提供的变量**，目前只有一个：
+URL 支持通用的 `${var}` 占位，但**只允许官方变量表里的变量**。表是可扩展的——以后要加新变量只往 `URL_VARS` 里加一个键；目前只有一个：
 
 | 变量 | 含义 | 取值示例 |
 |---|---|---|
-| `${version}` | 当前 cce 支持的模板 schema 版本（整数） | `1`、`2` |
+| `${version}` | 当前 cce 支持的模板 schema 版本（整数） | `2` |
 
-cce 内部定义常量 `TEMPLATE_SCHEMA_VERSION`（现为 `1`，v2 引擎上线后置为 `2`）。URL 里出现白名单之外的 `${foo}` → 视为非法（`cce template url` 设置时即报错拒绝）。
+- 实现：`URL_VARS = { version: String(TEMPLATE_SCHEMA_VERSION) }`，`substituteUrlVars(url)` **复用模板表达式引擎** `expr.render(url, URL_VARS, { strict: true })`——`${version}` 当标识符解析成表里的值，未知 `${foo}` 在 strict 下抛错。
+- `TEMPLATE_SCHEMA_VERSION = 2`（实现已落地）。URL 里出现白名单之外的 `${foo}` → 非法（`cce template url` 设置时即报错拒绝）。
 
 ### 9.3 默认源 URL（改为带版本）
 
@@ -312,6 +313,15 @@ cce template url https://mirror.intra/cce/builtin.v${version}.json
 - 在**拉取前**把 URL 里的 `${version}` 替换成 `TEMPLATE_SCHEMA_VERSION`。
 - 缓存与 ETag/If-None-Match 以**替换后的实际 URL** 为键。
 - `cce template`（状态）展示**替换后的实际 URL**，避免用户看到占位符困惑。
+
+### 9.6 缓存有效期与超时（已落地）
+
+- **TTL = 3 小时**（`TTL_MS = 3 * 60 * 60 * 1000`）：缓存文件在 3 小时内直接用，不联网。
+- **超时 = 5 秒**（`FETCH_TIMEOUT_MS = 5000`）。过期后联网拉取：
+  - 5 秒内拿到 → 原子替换本地缓存（写 `.tmp` 再 rename），本次即用最新模板。
+  - 超过 5 秒（或失败）→ 放弃本次拉取，**降级使用现有缓存文件**。
+- **首次无缓存**时没有可降级的旧文件，只能等这一次拉取的结果。
+- 注：不做「超时后台继续拉取」——命令行进程无可靠的后台语义，5 秒对正常网络足够。
 
 ---
 

@@ -5,7 +5,6 @@ const fs = require('fs');
 const config = require('../config');
 const cache = require('../cache');
 const tpl = require('../templates');
-const { maskEnvObject } = require('../util/mask');
 const { openUrl } = require('../util/open');
 const { pick } = require('../util/picker');
 const log = require('../util/log');
@@ -68,7 +67,8 @@ async function run(args) {
 // touches the network.
 async function status() {
   const cfg = config.load();
-  const url = (cfg.template && cfg.template.url) || null;
+  let url = (cfg.template && cfg.template.url) || null;
+  if (url) { try { url = tpl.substituteUrlVars(url); } catch { /* show raw on bad vars */ } }
   const offline = Boolean(cfg.template && cfg.template.offline);
   const st = cache.readTemplate();
 
@@ -107,12 +107,54 @@ async function listTemplates(args) {
   for (const tp of arr) {
     const desc = localize(tp.description);
     log.plain(`  ${pc.cyan(tp.name)}${desc ? '  ' + pc.dim(desc) : ''}`);
-    if (tp.required.length > 0) {
-      log.plain(`     ${pc.dim(t('add.listFields', { names: tp.required.map((r) => r.name).join(', ') }))}`);
+    const s = summarizeInputs(tp.inputs);
+    const selects = [...new Set(s.selects)];
+    const fields = [...new Set(s.fields)];
+    if (selects.length > 0) {
+      log.plain(`     ${pc.dim(t('add.listChoices', { names: selects.join(', ') }))}`);
+    }
+    if (fields.length > 0) {
+      log.plain(`     ${pc.dim(t('add.listFields', { names: fields.join(', ') }))}`);
     }
     log.plain(`     ${pc.dim(t('add.listSource', { file: tp.source }))}`);
   }
   return 0;
+}
+
+// Flatten an input tree into the named selects and the prompted (env/var) fields.
+function summarizeInputs(inputs, acc) {
+  acc = acc || { selects: [], fields: [] };
+  for (const n of inputs || []) {
+    if (n.type === 'select') {
+      if (n.name) acc.selects.push(n.name);
+      for (const o of n.options) summarizeInputs(o.inputs, acc);
+    } else if (n.type === 'var') {
+      acc.fields.push(n.name);
+    } else if (n.type === 'env' && n.value === undefined) {
+      acc.fields.push(n.name);
+    }
+  }
+  return acc;
+}
+
+// Recursively print an input tree for `cce template show`.
+function printInputs(inputs, indent) {
+  const pad = '  '.repeat(indent);
+  for (const n of inputs || []) {
+    if (n.type === 'select') {
+      const d = localize(n.description);
+      const id = n.name ? pc.dim(` (${n.name})`) : '';
+      log.plain(`${pad}${pc.bold('◆')} ${d || n.name || ''}${id}`);
+      for (const o of n.options) {
+        log.plain(`${pad}  ${pc.dim('-')} ${localize(o.label) || o.name} ${pc.dim(`(${o.name})`)}`);
+        printInputs(o.inputs, indent + 2);
+      }
+    } else if (n.type === 'var' || (n.type === 'env' && n.value === undefined)) {
+      const d = localize(n.description);
+      const tag = n.type === 'var' ? pc.dim(' [var]') : '';
+      log.plain(`${pad}${pc.cyan('•')} ${pc.cyan(n.name)}${tag}${d ? '  ' + pc.dim(d) : ''}`);
+    }
+  }
 }
 
 // `cce template show <name> [--from <src>]`
@@ -136,23 +178,18 @@ async function showTemplate(args) {
   log.plain('');
 
   log.plain(pc.bold(t('show.envVars')));
-  const masked = maskEnvObject(tp.env);
-  const keys = Object.keys(masked).sort();
+  const keys = Object.keys(tp.env).sort();
   if (keys.length === 0) {
     log.plain(pc.dim(t('show.envEmpty')));
   } else {
     const w = Math.max(...keys.map((k) => k.length));
-    for (const k of keys) log.plain(`  ${pc.cyan(k.padEnd(w))}  ${masked[k]}`);
+    for (const k of keys) log.plain(`  ${pc.cyan(k.padEnd(w))}  ${tp.env[k]}`);
   }
 
-  if (tp.required.length > 0) {
+  if (tp.inputs.length > 0) {
     log.plain('');
-    log.plain(pc.bold(t('template.showRequired')));
-    for (const it of tp.required) {
-      const d = localize(it.description);
-      const def = typeof it.default === 'string' ? pc.dim(` [${it.default}]`) : '';
-      log.plain(`  ${pc.cyan(it.name)}${def}${d ? '  ' + pc.dim(d) : ''}`);
-    }
+    log.plain(pc.bold(t('template.showInputs')));
+    printInputs(tp.inputs, 0);
   }
   if (tp.docs) {
     log.plain('');
@@ -260,6 +297,14 @@ function urlCmd(args) {
   }
   if (!tpl.isUrl(arg)) {
     log.error(t('template.urlInvalid', { val: arg }));
+    return 1;
+  }
+  // Reject unknown ${vars} now (only ${version} is official). Store the raw URL
+  // with the placeholder — it resolves per-version at fetch time.
+  try {
+    tpl.substituteUrlVars(arg);
+  } catch (e) {
+    log.error(e.message);
     return 1;
   }
   cfg.template.url = arg;

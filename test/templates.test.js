@@ -37,42 +37,55 @@ test('localize: string passes through, object resolves by lang with fallbacks', 
   i18n.setLang('en');
 });
 
-test('normalizeTemplate drops non-string env values and malformed required items', () => {
+test('normalizeTemplate parses the v2 inputs tree, dropping malformed nodes', () => {
   const tpl = templates.normalizeTemplate('x', {
     description: { en: 'X' },
-    env: { A: 'a', B: 123, C: null },
-    required: [
-      { name: 'TOK', description: { en: 'token' } },
-      { name: '', description: 'skip — empty name' },
-      { description: 'skip — no name' },
-      { name: 'WITH_DEFAULT', default: 'd' },
-      { name: 'BAD_DEFAULT', default: 5 },
+    name: 'x-${plan}',
+    docs: 'https://d',
+    env: { A: 'a', B: 123, C: null, D: '${plan}' },
+    inputs: [
+      { type: 'env', name: 'TOK', description: { en: 'token' } },
+      { name: 'DEFAULTED', value: 'lit' }, // type defaults to env; value → fixed, no prompt
+      { type: 'env', name: '' }, // dropped: empty name
+      { type: 'var', name: 'region', default: 'cn' },
+      { type: 'const', vars: { x: '1', y: 2 }, env: { K: 'v' } },
+      { type: 'select', name: 'plan', options: [
+        { name: 'a', label: { en: 'A' }, inputs: [{ type: 'env', name: 'NESTED' }] },
+        { name: '', label: {} }, // dropped option: empty name
+      ] },
+      { type: 'select', options: [] }, // dropped: no options
+      { type: 'bogus' }, // dropped: unknown type
+      'not an object', // dropped
     ],
   }, 'file.json');
 
-  assert.deepStrictEqual(tpl.env, { A: 'a' });
-  assert.strictEqual(tpl.required.length, 3);
-  assert.deepStrictEqual(tpl.required[0], { name: 'TOK', description: { en: 'token' } });
-  assert.deepStrictEqual(tpl.required[1], { name: 'WITH_DEFAULT', description: null, default: 'd' });
-  assert.deepStrictEqual(tpl.required[2], { name: 'BAD_DEFAULT', description: null });
+  assert.deepStrictEqual(tpl.env, { A: 'a', D: '${plan}' });
+  assert.strictEqual(tpl.nameExpr, 'x-${plan}');
+  assert.strictEqual(tpl.docs, 'https://d');
+  assert.strictEqual(tpl.inputs.length, 5);
+  assert.deepStrictEqual(tpl.inputs[0], { type: 'env', name: 'TOK', description: { en: 'token' } });
+  assert.deepStrictEqual(tpl.inputs[1], { type: 'env', name: 'DEFAULTED', description: null, value: 'lit' });
+  assert.deepStrictEqual(tpl.inputs[2], { type: 'var', name: 'region', description: null, default: 'cn' });
+  assert.deepStrictEqual(tpl.inputs[3], { type: 'const', vars: { x: '1' }, env: { K: 'v' } });
+  const sel = tpl.inputs[4];
+  assert.strictEqual(sel.type, 'select');
+  assert.strictEqual(sel.name, 'plan');
+  assert.strictEqual(sel.options.length, 1);
+  assert.strictEqual(sel.options[0].name, 'a');
+  assert.strictEqual(sel.options[0].inputs.length, 1);
   assert.strictEqual(tpl.source, 'file.json');
 });
 
-test('buildEnvFromTemplate merges answers over the fixed env', () => {
-  const tpl = {
-    env: { ANTHROPIC_BASE_URL: 'https://x', ANTHROPIC_MODEL: 'm' },
-    required: [{ name: 'ANTHROPIC_AUTH_TOKEN' }],
-  };
-  const env = templates.buildEnvFromTemplate(tpl, { ANTHROPIC_AUTH_TOKEN: 'sk-123' });
-  assert.deepStrictEqual(env, {
-    ANTHROPIC_BASE_URL: 'https://x',
-    ANTHROPIC_MODEL: 'm',
-    ANTHROPIC_AUTH_TOKEN: 'sk-123',
-  });
-  assert.deepStrictEqual(templates.buildEnvFromTemplate(tpl, {}), {
-    ANTHROPIC_BASE_URL: 'https://x',
-    ANTHROPIC_MODEL: 'm',
-  });
+test('substituteUrlVars resolves ${version}, passes plain URLs, rejects unknown vars', () => {
+  const v = String(templates.TEMPLATE_SCHEMA_VERSION);
+  assert.strictEqual(
+    templates.substituteUrlVars('https://x/builtin.v${version}.json'),
+    `https://x/builtin.v${v}.json`
+  );
+  assert.strictEqual(templates.substituteUrlVars('https://x/static.json'), 'https://x/static.json');
+  assert.throws(() => templates.substituteUrlVars('https://x/${nope}.json'), templates.TemplateError);
+  // The default source resolves to the versioned file.
+  assert.ok(templates.displayUrl({}).endsWith(`builtin.v${v}.json`));
 });
 
 test('isUrl distinguishes URLs from file paths', () => {
