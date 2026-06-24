@@ -1,4 +1,25 @@
 {
+  "claude": {
+    "description": {
+      "en": "Claude official via a local proxy (subscription or API key)",
+      "zh-CN": "Claude 官方（走本地代理，订阅或 API Key 均可）"
+    },
+    "docs": "https://docs.claude.com/en/docs/claude-code",
+    "env": {
+      "HTTP_PROXY": "http://127.0.0.1:${port}",
+      "HTTPS_PROXY": "http://127.0.0.1:${port}"
+    },
+    "inputs": [
+      {
+        "type": "var",
+        "name": "port",
+        "description": {
+          "en": "Local proxy port (127.0.0.1, e.g. v2rayN 10808|10809, Clash 7890)",
+          "zh-CN": "本地代理端口（127.0.0.1，如 v2rayN 10808|10809、Clash 7890）"
+        }
+      }
+    ]
+  },
   "deepseek": {
     "description": {
       "en": "DeepSeek (Claude-compatible API)",
