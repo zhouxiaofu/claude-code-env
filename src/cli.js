@@ -75,7 +75,7 @@ async function runSubcommand(name, args) {
   }
 }
 
-async function runLaunch({ envName: envArg, mergeArgs, overrideArg, settingsMode }) {
+async function runLaunch({ envName: envArg, settingsMode, cliTokens, only }) {
   // Self-update check before launching claude (notify/auto per config). Fully
   // guarded — never blocks or breaks the launch.
   await require('./update').maybeCheckOnLaunch();
@@ -101,7 +101,7 @@ async function runLaunch({ envName: envArg, mergeArgs, overrideArg, settingsMode
     }
   }
 
-  return launchClaudeWithEnv({ envName, mergeArgs, overrideArg, settingsMode, cfg });
+  return launchClaudeWithEnv({ envName, settingsMode, cliTokens, only, cfg });
 }
 
 /**
@@ -111,12 +111,12 @@ async function runLaunch({ envName: envArg, mergeArgs, overrideArg, settingsMode
  *
  * @param {object} opts
  * @param {string|null} opts.envName
- * @param {string[]=}   opts.mergeArgs    array of -a values (default [])
- * @param {string|null=} opts.overrideArg the -A value, or null if not used
+ * @param {string[]=}   opts.cliTokens    claude args from -c/-r/-n + `--` passthrough
+ * @param {boolean=}    opts.only         -o/--only: drop config-default args
  * @param {string|null=} opts.settingsMode CLI -m mode, or null to inherit config
  * @param {object=}     opts.cfg          pre-loaded config (optional, saves a re-read)
  */
-function launchClaudeWithEnv({ envName, mergeArgs = [], overrideArg = null, settingsMode = null, cfg = null }) {
+function launchClaudeWithEnv({ envName, cliTokens = [], only = false, settingsMode = null, cfg = null }) {
   if (!cfg) cfg = config.load();
 
   let entry = null;
@@ -168,8 +168,8 @@ function launchClaudeWithEnv({ envName, mergeArgs = [], overrideArg = null, sett
     ...argsUtil.buildClaudeArgs({
       globalArgs: cfg.args || '',
       envEntry: entry,
-      mergeArgs,
-      overrideArg,
+      cliTokens,
+      only,
     }),
   ];
 

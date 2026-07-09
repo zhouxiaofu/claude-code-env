@@ -105,6 +105,17 @@ cce -e deepseek -A "--resume X"                  # override all config defaults
 cce -e deepseek -A                               # launch bare claude with no args
 ```
 
+> **Update (2026-07, supersedes the `-a`/`-A` model below):** `-a`/`-A` are
+> removed in favor of an orthogonal model — args after `--` are forwarded to
+> claude (merged with config defaults), `-o` / `--only` drops the config
+> defaults, and `-c`/`-r`/`-n` are first-class aliases for claude's
+> `--continue`/`--resume`/`--name`. Typing the old `-a`/`-A` hard-errors and
+> prints the rewrite. Rationale: `--` is a universal convention and avoids
+> quote re-splitting; splitting "which args" (`--`) from "keep defaults or not"
+> (`-o`) into two orthogonal switches is more self-documenting than the
+> case-paired `-a`/`-A`. See [usage.md → Claude arg management](usage.en.md#claude-arg-management).
+> The original design is kept below as history.
+
 **Arg rules** (redesigned for v0.1):
 
 1. `cce` **no longer implicitly forwards** unknown args. Every claude CLI flag

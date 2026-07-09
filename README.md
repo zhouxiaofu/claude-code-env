@@ -61,7 +61,7 @@ cce                # 启动 Claude Code，已经跑在 DeepSeek 上
 }
 ```
 
-> `args` 里是传给 `claude` 的默认参数，常用的是 `--permission-mode bypassPermissions`（跳过权限确认）。配在顶层＝对所有 env 生效；配在某个 env 里＝只对它生效。启动时还能用 `cce -e deepseek -a "..."` 临时追加。
+> `args` 里是传给 `claude` 的默认参数，常用的是 `--permission-mode bypassPermissions`（跳过权限确认）。配在顶层＝对所有 env 生效；配在某个 env 里＝只对它生效。启动时还能用 `cce -e deepseek -- ...` 临时追加。
 
 ---
 
@@ -90,10 +90,14 @@ cce                # 启动 Claude Code，已经跑在 DeepSeek 上
 | `cce pick` | 弹出菜单选完即启动 |
 | `cce add` / `cce remove` | 从模板创建 / 删除配置 |
 | `cce list` / `cce use <name>` | 查看配置 / 设默认 |
-| `cce -a "--permission-mode bypassPermissions"` | 临时追加 claude 参数 |
+| `cce -e kimi -- --permission-mode bypassPermissions` | `--` 之后的参数透传给 claude（与默认合并） |
+| `cce -e kimi -o -- --resume XYZ` | `-o` 丢弃默认参数，只用这些 |
+| `cce -e kimi -c` / `-n data` | 常用会话参数直达：继续对话 / 命名会话 |
 | `cce update` | 升级 cce 到 npm 最新版 |
 
-> ⚠ 传给 claude 的参数必须包在 `-a "..."`（追加）或 `-A "..."`（整组覆盖）里，cce 不会转交它不认识的参数。
+> ⚠ 传给 claude 的参数放在 `--` 之后（默认与配置的默认参数合并；加 `-o` 则丢弃默认）。`--` 之前 cce 不认识的参数会报错。常用的 `-c`/`-r`/`-n` 已做成 cce 直达参数，无需 `--`。
+>
+> 注：旧的 `-a "..."` / `-A "..."` 已移除，请改用 `--` / `-o`（运行时会给出改写提示）。
 
 其他能力：默认参数管理（全局或按 env）、与 `~/.claude/settings.json` 的三种合并模式（cce 从不改写该文件）、中英双语界面、四种 shell 的 Tab 补全（连 env 名都能补全）、启动时后台自动更新。详见文档：
 

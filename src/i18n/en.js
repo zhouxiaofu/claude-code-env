@@ -4,21 +4,23 @@
 // in the other language files. Placeholders use {name} syntax.
 module.exports = {
   // parser
-  'parser.overrideOnce': '{tok} can only be specified once',
-  'parser.aAndAExclusive': '-a and -A are mutually exclusive',
   'parser.envRequiresName': 'Option {tok} requires an env name',
-  'parser.aRequiresValue': '-a requires a value (e.g. -a "--permission-mode bypassPermissions")',
+  'parser.nameRequiresValue': '{tok} requires a value (e.g. -n data)',
+  'parser.aRemoved':
+    '-a has been removed. Put claude args after -- instead ' +
+    '(they merge with your config defaults):\n' +
+    '    {rewrite}',
+  'parser.ARemoved':
+    '-A has been removed. Use -o to drop config defaults, plus -- for args:\n' +
+    '    {rewrite}',
   'parser.unknownOption':
     'Unknown option: {tok}\n' +
-    'cce does not pass unknown flags through to claude.\n' +
-    'Claude args must be wrapped in -a "..." (merge) or -A "..." (override).\n' +
-    'Try: cce -a "{tok}"{hint}',
-  'parser.unknownOptionQuoteHint': ' (and quote the value)',
+    'cce does not forward unknown flags. Put claude args after -- instead:\n' +
+    '    cce [-e <env>] -- {tok} ...',
   'parser.mergeModeRequiresValue': '{tok} requires a value (override|cce|claude)',
   'parser.invalidMergeMode': 'Invalid merge mode "{val}". Use one of: override, cce, claude',
   'parser.pickNoEnvFlag': '-e/--env not allowed with `cce pick` (the env is chosen via the menu)',
-  'parser.pickUnknownOption': 'Unknown option for `cce pick`: {tok} (only -a / -A are allowed)',
-  'parser.pickARequiresValue': '-a requires a value',
+  'parser.pickUnknownOption': 'Unknown option for `cce pick`: {tok} (use -- for claude args; -o/-c/-r/-n also allowed)',
 
   // cli / launch
   'cli.defaultMissing': 'default env "{name}" does not exist in config (fix with `cce use <name>` or `cce edit`)',

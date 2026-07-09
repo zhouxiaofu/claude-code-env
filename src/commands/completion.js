@@ -56,7 +56,7 @@ async function run(args) {
 }
 
 const SUB = ['list', 'ls', 'add', 'remove', 'rm', 'template', 'tpl', 'show', 'edit', 'use', 'current', 'lang', 'pick', 'completion', 'update', 'help'];
-const TOP_FLAGS = ['-e', '--env', '-a', '-A', '-m', '--merge-mode', '-h', '--help', '-v', '--version'];
+const TOP_FLAGS = ['-e', '--env', '-o', '--only', '-c', '--continue', '-r', '--resume', '-n', '--name', '-m', '--merge-mode', '-h', '--help', '-v', '--version'];
 const MERGE_MODES = ['override', 'cce', 'claude'];
 const LANGS = ['en', 'zh-CN', 'auto'];
 const TEMPLATE_SUB = ['ls', 'list', 'show', 'docs', 'refresh', 'url', 'offline'];
@@ -184,8 +184,10 @@ end
 # Subcommands (only when no subcommand has been typed yet)
 complete -c cce -n '__fish_use_subcommand' -a 'list ls add remove rm template tpl show edit use current lang pick completion update help'
 complete -c cce -n '__fish_use_subcommand' -s e -l env -a '(__cce_envs)' -d 'Use an env'
-complete -c cce -n '__fish_use_subcommand' -s a -d 'Merge claude args'
-complete -c cce -n '__fish_use_subcommand' -s A -d 'Override claude args'
+complete -c cce -n '__fish_use_subcommand' -s o -l only -d 'Drop config default args'
+complete -c cce -n '__fish_use_subcommand' -s c -l continue -d 'Continue last conversation'
+complete -c cce -n '__fish_use_subcommand' -s r -l resume -d 'Resume a conversation'
+complete -c cce -n '__fish_use_subcommand' -s n -l name -d 'Name this session'
 complete -c cce -n '__fish_use_subcommand' -s h -l help
 complete -c cce -n '__fish_use_subcommand' -s v -l version
 
@@ -201,6 +203,10 @@ complete -c cce -n '__fish_seen_subcommand_from template tpl' -a 'ls list show d
 
 # -e/--env arg completion at any position before pass-through
 complete -c cce -s e -l env -a '(__cce_envs)' -d 'Use an env'
+complete -c cce -s o -l only -d 'Drop config default args'
+complete -c cce -s c -l continue -d 'Continue last conversation'
+complete -c cce -s r -l resume -d 'Resume a conversation'
+complete -c cce -s n -l name -d 'Name this session'
 complete -c cce -s m -l merge-mode -x -a 'override cce claude' -d 'settings.json env merge mode'
 `;
 }
@@ -229,7 +235,7 @@ Register-ArgumentCompleter -CommandName cce -Native -ScriptBlock {
     }
 
     $subcommands = @('list','ls','add','remove','rm','template','tpl','show','edit','use','current','lang','pick','completion','update','help')
-    $flags       = @('-e','--env','-m','--merge-mode','-h','--help','-v','--version')
+    $flags       = @('-e','--env','-o','--only','-c','--continue','-r','--resume','-n','--name','-m','--merge-mode','-h','--help','-v','--version')
 
     # Complete env names after these tokens
     if ($prev -in @('-e','--env','use','show','remove','rm')) {

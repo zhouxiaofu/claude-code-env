@@ -3,21 +3,22 @@
 // 简体中文 message catalog。键集合必须与 en.js 完全一致；占位符用 {name} 形式。
 module.exports = {
   // parser
-  'parser.overrideOnce': '{tok} 只能出现一次',
-  'parser.aAndAExclusive': '-a 和 -A 互斥，不能同时使用',
   'parser.envRequiresName': '选项 {tok} 后面需要跟一个 env 名',
-  'parser.aRequiresValue': '-a 需要一个值（例如 -a "--permission-mode bypassPermissions"）',
+  'parser.nameRequiresValue': '{tok} 需要一个值（例如 -n data）',
+  'parser.aRemoved':
+    '-a 已移除。请把 claude 参数放到 -- 之后（会与配置默认参数合并）：\n' +
+    '    {rewrite}',
+  'parser.ARemoved':
+    '-A 已移除。用 -o 丢弃配置默认参数，再用 -- 传参：\n' +
+    '    {rewrite}',
   'parser.unknownOption':
     '未知选项：{tok}\n' +
-    'cce 不会把未知 flag 透传给 claude。\n' +
-    'claude 的参数必须包在 -a "..."（合并）或 -A "..."（覆盖）里。\n' +
-    '试试：cce -a "{tok}"{hint}',
-  'parser.unknownOptionQuoteHint': '（记得给值加引号）',
+    'cce 不会透传未知 flag。请把 claude 参数放到 -- 之后：\n' +
+    '    cce [-e <env>] -- {tok} ...',
   'parser.mergeModeRequiresValue': '{tok} 需要一个值（override|cce|claude）',
   'parser.invalidMergeMode': '无效的合并模式 "{val}"。可选值：override、cce、claude',
   'parser.pickNoEnvFlag': '`cce pick` 不接受 -e/--env（env 通过菜单选择）',
-  'parser.pickUnknownOption': '`cce pick` 不认识的选项：{tok}（只允许 -a / -A）',
-  'parser.pickARequiresValue': '-a 需要一个值',
+  'parser.pickUnknownOption': '`cce pick` 不认识的选项：{tok}（claude 参数用 -- 传；也可用 -o/-c/-r/-n）',
 
   // cli / launch
   'cli.defaultMissing': '默认 env "{name}" 在配置里不存在（用 `cce use <name>` 或 `cce edit` 修复）',

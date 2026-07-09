@@ -76,25 +76,34 @@ cce <subcommand> [args...]    manage envs
 | Option | Description |
 |---|---|
 | `-e, --env <name>` | Use a specific env for this launch (otherwise the config `default`). |
-| `-a "<args>"` | **Merge** claude args onto the config defaults (repeatable). |
-| `-A "<args>"` | **Override**: use only these claude args, drop all config defaults. A bare `-A` at the end of the command launches claude with no args at all. |
+| `-- <claude args...>` | Everything after `--` is passed verbatim to claude, **merged** onto the config defaults. |
+| `-o, --only` | **Drop** all config default args; use only what follows `--` (or nothing = bare claude). |
+| `-c, --continue` | Continue the most recent conversation (= claude's `--continue`). |
+| `-r, --resume [id]` | Resume a conversation; bare opens the interactive picker (= claude's `--resume`). |
+| `-n, --name <name>` | Set a display name for this session (= claude's `--name`). |
 | `-m, --merge-mode <mode>` | How this env's `env` reconciles with `settings.json`: `override` (default), `cce`, or `claude`. See [reconciliation](#settingsjson-reconciliation). |
 | `-h, --help` | Show help. |
 | `-v, --version` | Show version. |
 
-> **Important:** `cce` does **not** pass unknown flags through to claude. Every
-> claude CLI flag must be wrapped in `-a "..."` or `-A "..."`. This keeps cce's
-> own flag space closed, so it can never collide with a future claude flag.
+> **Important:** `cce` does **not** pass unknown flags (before `--`) through to
+> claude — it errors on them. Put claude args after `--`. This keeps cce's own
+> flag space closed, so it can never collide with a future claude flag. The few
+> most common session flags (`-c`/`-r`/`-n`) are first-class cce flags, so they
+> need no `--`.
 
 ```bash
 cce                                              # default env + config args
 cce -e kimi                                      # switch env for this run
-cce -e kimi -a "--permission-mode bypassPermissions"   # merge extra claude args
-cce -e kimi -a "-c"                              # claude's own -c, wrapped in -a
-cce -e kimi -A "--resume SESSION_ID"             # override all config defaults
-cce -e kimi -A                                   # launch bare claude, no args
+cce -e kimi -- --permission-mode bypassPermissions   # merge extra claude args
+cce -e kimi -c                                   # continue the last conversation (direct)
+cce -e kimi -n data                              # name this session "data" (direct)
+cce -e kimi -o -- --resume SESSION_ID            # use only these args, drop config defaults
+cce -e kimi -o                                   # launch bare claude, no args
 cce -e kimi -m cce                               # merge env with settings.json, kimi wins
 ```
+
+> The old `-a "..."` / `-A "..."` are removed: `-a "X"` → `-- X`, `-A "X"` →
+> `-o -- X`, bare `-A` → `-o`. Typing the old form prints the new command to copy.
 
 ### Subcommands
 
@@ -109,7 +118,7 @@ cce -e kimi -m cce                               # merge env with settings.json,
 | `use <name>` | Set the default env. `cce use --none` clears it. |
 | `current` | Print the current default env name. |
 | `lang [en\|zh-CN\|auto]` | Show or set the UI language (persists to config). See [Language / i18n](#language--i18n). |
-| `pick [-a/-A/-m ...]` | Interactively pick an env from a menu, then launch claude. |
+| `pick [-o/-c/-r/-n/-m/-- ...]` | Interactively pick an env from a menu, then launch claude. |
 | `completion <shell>` | Print a shell completion script (`bash`/`zsh`/`fish`/`powershell`). |
 | `update [--check]` | Update cce itself to the latest npm version. Add `--check` to report only, without installing. See [Updating cce](#updating-cce). |
 | `help` | Show help. |
@@ -299,7 +308,7 @@ conventions). The first run writes a starter config if none exists.
   "lang": null,
 
   // Global default claude args — applied to every launch.
-  // Skip them for one run with `-A "..."`.
+  // Skip them for one run with `-o`.
   "args": "--permission-mode bypassPermissions",
 
   // Global default for how an env's `env` reconciles with ~/.claude/settings.json.
@@ -353,25 +362,25 @@ are three layers, lowest to highest priority:
 |---|---|---|
 | 1. Global | config root `args` | Applied to every launch. |
 | 2. Per-env | `envs.<name>.args` + `argsOverride` | `argsOverride: true` *replaces* the global layer for that env. |
-| 3. CLI | `-a "..."` / `-A "..."` | `-a` appends; `-A` replaces everything below it. |
+| 3. CLI | `-c` / `-r` / `-n` / `-- ...` | First-class session flags and args after `--`, appended on top. `-o` drops layers 1 & 2. |
 
 Combining is **pure concatenation — cce never dedupes**:
 
 ```
-final = (env.argsOverride ? "" : globalArgs) + " " + env.args + " " + all -a "..."
+final = (-o or env.argsOverride ? "" : globalArgs) + " " + (-o ? "" : env.args) + " " + [-c/-r/-n expanded] + " " + [args after --]
 ```
 
 The result is shell-tokenized into argv and handed to claude, which resolves
 repeats itself (most flags are last-wins; repeatable flags like `--add-dir`
-stack). To force an exact arg set, use `-A`.
+stack). To force an exact arg set, use `-o`.
 
 | Command | What spawns |
 |---|---|
 | `cce -e deepseek` | `claude --permission-mode bypassPermissions --add-dir D:\code` |
-| `cce -e deepseek -a "--resume X"` | `claude --permission-mode bypassPermissions --add-dir D:\code --resume X` |
-| `cce -e deepseek -A "--resume X"` | `claude --resume X` |
-| `cce -e deepseek -A` | `claude` (no args) |
-| `cce -e foo -a "X" -A "Y"` | **Error:** `-a and -A are mutually exclusive` |
+| `cce -e deepseek -- --resume X` | `claude --permission-mode bypassPermissions --add-dir D:\code --resume X` |
+| `cce -e deepseek -c` | `claude --permission-mode bypassPermissions --add-dir D:\code --continue` |
+| `cce -e deepseek -o -- --resume X` | `claude --resume X` |
+| `cce -e deepseek -o` | `claude` (no args) |
 
 **Tokenizer rule (Windows-friendly):** backslashes are always literal; only
 quotes group tokens. So `--add-dir D:\code` just works. For paths with spaces,
@@ -535,7 +544,7 @@ Pick an env to launch claude:
 - `↑/↓` or `k/j` move, number keys `1`–`9` jump, `Enter` selects, `Esc`/`Ctrl+C`/`q` cancels.
 - Picking does **not** change your default — use `cce use <name>` for that.
 - Bare `cce` also opens the picker when you have envs but no default set.
-- `-a` / `-A` / `-m` work too: `cce pick -a "--verbose" -m cce`.
+- `-o` / `-c` / `-r` / `-n` / `-m` / `--` work too: `cce pick -m cce -- --verbose`.
 - Requires a TTY. In non-interactive contexts (CI, pipes) use `cce -e <name>`.
 
 ---
@@ -635,8 +644,8 @@ Set it by opening the config with `cce edit` and editing the root `updateMode`:
 |---|---|
 | `Could not find the claude executable` | Install Claude Code, ensure `claude` is on PATH, or set `CCE_CLAUDE_BIN=/full/path/to/claude`. |
 | `Env "X" does not exist` | `cce list` to see what's defined; `cce edit` to add one. |
-| `Unknown option: --foo` | All claude args go inside `-a "..."` (merge) or `-A "..."` (override). |
-| `-a and -A are mutually exclusive` | Pick one: `-a` adds to defaults, `-A` replaces them. |
+| `Unknown option: --foo` | Put claude args after `--` (merge); add `-o` to drop config defaults. |
+| `-a has been removed` / `-A has been removed` | Old flags are gone; follow the printed rewrite — `--` (`-a "X"` → `-- X`) or `-o -- ...` (`-A "X"` → `-o -- X`). |
 | `default env "X" does not exist in config` | `cce use <name>` to switch, or `cce edit` to fix. Bare `cce` falls back to the picker. |
 | Switched env but still hitting the old endpoint | Likely a stale key in `~/.claude/settings.json`. `override` mode neutralizes it; check `cce show <name>` and verify `${VAR}` placeholders resolve. |
 | `Could not read <settings.json> — treating it as empty` | Your `settings.json` is invalid JSON; reconciliation skipped it. Fix the JSON. |

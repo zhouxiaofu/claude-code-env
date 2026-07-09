@@ -62,7 +62,7 @@ Prefer doing it by hand? `cce edit` opens the config file (`~/.claude/cce/config
 }
 ```
 
-> `args` holds default flags passed to `claude` — the common one is `--permission-mode bypassPermissions` (skip permission prompts). At the top level it applies to every env; inside an env it applies to just that one. You can also append at launch with `cce -e deepseek -a "..."`.
+> `args` holds default flags passed to `claude` — the common one is `--permission-mode bypassPermissions` (skip permission prompts). At the top level it applies to every env; inside an env it applies to just that one. You can also append at launch with `cce -e deepseek -- ...`.
 
 ---
 
@@ -91,10 +91,14 @@ They don't conflict — let cc-switch manage the global default and use cce for 
 | `cce pick` | interactive menu, then launch |
 | `cce add` / `cce remove` | create from template / delete an env |
 | `cce list` / `cce use <name>` | list envs / set the default |
-| `cce -a "--permission-mode bypassPermissions"` | append extra claude flags |
+| `cce -e kimi -- --permission-mode bypassPermissions` | pass args after `--` to claude (merged with defaults) |
+| `cce -e kimi -o -- --resume XYZ` | `-o` drops config defaults, use only these |
+| `cce -e kimi -c` / `-n data` | common session flags, direct: continue / name a session |
 | `cce update` | upgrade cce to the latest npm version |
 
-> ⚠ All claude CLI flags go inside `-a "..."` (append) or `-A "..."` (override) — cce never forwards flags it doesn't recognize.
+> ⚠ Claude CLI flags go after `--` (merged with your config defaults; add `-o` to drop the defaults). cce errors on flags it doesn't recognize *before* the `--`. The common `-c`/`-r`/`-n` are first-class cce flags, so they need no `--`.
+>
+> Note: the old `-a "..."` / `-A "..."` are removed — use `--` / `-o` instead (cce prints the rewrite if you hit them).
 
 More under the hood: default-args management (global or per-env), three merge modes against `~/.claude/settings.json` (cce never edits that file), English/Chinese UI, Tab completion for four shells (including your env names), background self-update. See the docs:
 

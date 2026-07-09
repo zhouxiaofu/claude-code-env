@@ -91,25 +91,32 @@ cce <子命令> [参数...]         管理 env
 | 选项 | 说明 |
 |---|---|
 | `-e, --env <name>` | 本次启动使用指定的 env（否则用配置里的 `default`）。 |
-| `-a "<args>"` | 把 claude 参数**合并**到配置默认之上（可重复）。 |
-| `-A "<args>"` | **覆盖**：只用这些 claude 参数，丢弃所有配置默认。命令末尾的裸 `-A` = 不带任何参数启动 claude。 |
+| `-- <claude 参数...>` | `--` 之后的所有内容原样透传给 claude，**合并**到配置默认之上。 |
+| `-o, --only` | **丢弃**所有配置默认参数，只用 `--` 之后给的（或什么都不给 = 裸 claude）。 |
+| `-c, --continue` | 继续最近一次对话（= claude 的 `--continue`）。 |
+| `-r, --resume [id]` | 恢复某次对话；裸写则打开交互选择器（= claude 的 `--resume`）。 |
+| `-n, --name <name>` | 给本次会话设一个显示名（= claude 的 `--name`）。 |
 | `-m, --merge-mode <mode>` | 本 env 的 `env` 如何与 `settings.json` 合并：`override`（默认）、`cce`、`claude`。见 [settings.json 合并](#settingsjson-合并)。 |
 | `-h, --help` | 显示帮助。 |
 | `-v, --version` | 显示版本。 |
 
-> **重要：** `cce` **不会**把未知 flag 透传给 claude。所有 claude 的 CLI flag 都必须包在
-> `-a "..."` 或 `-A "..."` 里。这让 cce 自己的 flag 空间保持封闭，永远不会与 claude 未来的
-> 新 flag 冲突。
+> **重要：** `cce` **不会**把 `--` 之前的未知 flag 透传给 claude —— 遇到就报错。要传 claude
+> 参数就放在 `--` 之后。这让 cce 自己的 flag 空间保持封闭，永远不会与 claude 未来的新 flag 冲突。
+> 少数最常用的会话参数（`-c`/`-r`/`-n`）已做成 cce 直达 flag，无需 `--`。
 
 ```bash
 cce                                              # 默认 env + 配置参数
 cce -e kimi                                      # 本次切换 env
-cce -e kimi -a "--permission-mode bypassPermissions"   # 合并额外的 claude 参数
-cce -e kimi -a "-c"                              # claude 自己的 -c，包在 -a 里
-cce -e kimi -A "--resume SESSION_ID"             # 覆盖所有配置默认参数
-cce -e kimi -A                                   # 启动裸 claude，不带参数
+cce -e kimi -- --permission-mode bypassPermissions   # 合并额外的 claude 参数
+cce -e kimi -c                                   # 继续上次对话（直达）
+cce -e kimi -n data                              # 把本次会话命名为 data（直达）
+cce -e kimi -o -- --resume SESSION_ID            # 只用这些参数，丢弃配置默认
+cce -e kimi -o                                   # 启动裸 claude，不带参数
 cce -e kimi -m cce                               # 与 settings.json 合并，kimi 优先
 ```
+
+> 旧的 `-a "..."` / `-A "..."` 已移除：`-a "X"` → `-- X`，`-A "X"` → `-o -- X`，裸 `-A` → `-o`。
+> 直接敲旧写法时，cce 会打印对应的新命令供你复制。
 
 ### 子命令
 
@@ -124,7 +131,7 @@ cce -e kimi -m cce                               # 与 settings.json 合并，ki
 | `use <name>` | 设置默认 env。`cce use --none` 清除默认。 |
 | `current` | 打印当前默认 env 名。 |
 | `lang [en\|zh-CN\|auto]` | 查看或设置界面语言（持久写入配置）。见 [多语言](#多语言)。 |
-| `pick [-a/-A/-m ...]` | 从菜单交互式选择一个 env，然后启动 claude。 |
+| `pick [-o/-c/-r/-n/-m/-- ...]` | 从菜单交互式选择一个 env，然后启动 claude。 |
 | `completion <shell>` | 打印 shell 补全脚本（`bash`/`zsh`/`fish`/`powershell`）。 |
 | `update [--check]` | 把 cce 自己升级到 npm 上的最新版。加 `--check` 只检查、不安装。详见 [更新 cce](#更新-cce)。 |
 | `help` | 显示帮助。 |
@@ -291,7 +298,7 @@ cce template offline off     # 关闭离线
   "lang": null,
 
   // 全局默认 claude 参数 —— 应用到每次启动。
-  // 想为某次启动跳过它们，用 `-A "..."`。
+  // 想为某次启动跳过它们，用 `-o`。
   "args": "--permission-mode bypassPermissions",
 
   // 全局默认：env 的 `env` 如何与 ~/.claude/settings.json 合并。
@@ -346,24 +353,24 @@ cce template offline off     # 关闭离线
 |---|---|---|
 | 1. 全局 | 配置根的 `args` | 应用到每次启动。 |
 | 2. 按 env（单个 env 专属） | `envs.<name>.args` + `argsOverride` | `argsOverride: true` 时该 env *替换*全局层。 |
-| 3. 命令行 | `-a "..."` / `-A "..."` | `-a` 追加；`-A` 替换其下所有层。 |
+| 3. 命令行 | `-c` / `-r` / `-n` / `-- ...` | 直达会话 flag 与 `--` 之后的参数，追加在最上层。`-o` 则丢弃第 1、2 层。 |
 
 合并是**纯拼接 —— cce 从不去重**：
 
 ```
-最终 = (env.argsOverride ? "" : 全局 args) + " " + env.args + " " + 所有 -a "..."
+最终 = (-o 或 env.argsOverride ? "" : 全局 args) + " " + (-o ? "" : env.args) + " " + [-c/-r/-n 展开] + " " + [-- 之后的参数]
 ```
 
 这串文本会按命令行规则拆成一个个参数后交给 claude，由 claude 自己处理重复（大多数参数是「后者覆盖前者」；
-像 `--add-dir` 这种可重复的参数则会叠加）。要强制只用一组精确参数，用 `-A`。
+像 `--add-dir` 这种可重复的参数则会叠加）。要强制只用一组精确参数，用 `-o`。
 
 | 命令 | 实际启动 |
 |---|---|
 | `cce -e deepseek` | `claude --permission-mode bypassPermissions --add-dir D:\code` |
-| `cce -e deepseek -a "--resume X"` | `claude --permission-mode bypassPermissions --add-dir D:\code --resume X` |
-| `cce -e deepseek -A "--resume X"` | `claude --resume X` |
-| `cce -e deepseek -A` | `claude`（无参数） |
-| `cce -e foo -a "X" -A "Y"` | **报错：** `-a 和 -A 互斥` |
+| `cce -e deepseek -- --resume X` | `claude --permission-mode bypassPermissions --add-dir D:\code --resume X` |
+| `cce -e deepseek -c` | `claude --permission-mode bypassPermissions --add-dir D:\code --continue` |
+| `cce -e deepseek -o -- --resume X` | `claude --resume X` |
+| `cce -e deepseek -o` | `claude`（无参数） |
 
 **分词规则（对 Windows 友好）：** 反斜杠永远是字面值，只有引号才分组 token。所以
 `--add-dir D:\code` 直接可用；路径带空格时用引号包起来：`--add-dir 'D:\My Code'`。
@@ -512,7 +519,7 @@ cce lang auto       # 清除设置 → 回到自动检测
 - `↑/↓` 或 `k/j` 移动，数字键 `1`–`9` 跳转，`Enter` 选定，`Esc`/`Ctrl+C`/`q` 取消。
 - 选择**不会**改变你的默认项 —— 要改默认用 `cce use <name>`。
 - 当你有 env 但没设默认时，裸 `cce` 也会打开选择器。
-- `-a` / `-A` / `-m` 同样可用：`cce pick -a "--verbose" -m cce`。
+- `-o` / `-c` / `-r` / `-n` / `-m` / `--` 同样可用：`cce pick -m cce -- --verbose`。
 - 需要 TTY。在非交互场景（CI、管道）下请用 `cce -e <name>`。
 
 ---
@@ -602,8 +609,8 @@ cce update --check  # 只检查、并告诉你有没有新版，不安装
 |---|---|
 | `Could not find the claude executable` | 安装 Claude Code，确认 `claude` 在 PATH 中，或设置 `CCE_CLAUDE_BIN=/full/path/to/claude`。 |
 | `Env "X" does not exist` | 用 `cce list` 看已定义的 env；`cce edit` 添加。 |
-| `Unknown option: --foo` | 所有 claude 参数都要包在 `-a "..."`（合并）或 `-A "..."`（覆盖）里。 |
-| `-a and -A are mutually exclusive` | 二选一：`-a` 追加到默认之上，`-A` 替换默认。 |
+| `Unknown option: --foo` | claude 参数要放在 `--` 之后（合并）；要丢弃配置默认加 `-o`。 |
+| `-a has been removed` / `-A has been removed` | 旧 flag 已移除；按提示改用 `--`（`-a "X"` → `-- X`）或 `-o -- ...`（`-A "X"` → `-o -- X`）。 |
 | `default env "X" does not exist in config` | 用 `cce use <name>` 切换，或 `cce edit` 修复。裸 `cce` 会回退到选择器。 |
 | 切了 env 还是命中旧端点 | 多半是 `~/.claude/settings.json` 里有残留键。`override` 模式会屏蔽它；查 `cce show <name>` 并确认 `${VAR}` 占位符能解析。 |
 | `Could not read <settings.json> — treating it as empty` | 你的 `settings.json` 不是合法 JSON，合并已跳过它。修一下 JSON。 |

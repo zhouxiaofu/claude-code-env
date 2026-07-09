@@ -73,12 +73,18 @@ function quoteArgs(tokens) {
  * Pure concat semantics — layers append in order, no dedup. Claude itself
  * handles duplicate flags (last-wins for most, stack for repeatables).
  *
- * Override rules:
- *  - `overrideArg !== null` (CLI -A) → only the override layer survives.
- *  - `envEntry.argsOverride === true` → env layer replaces global layer
- *    (CLI -a can still append on top).
+ * Layer order: global default → env default → CLI (cliTokens).
+ *  - `only === true` (CLI -o/--only) → the config-default layers (global + env)
+ *    are dropped; only the CLI layer survives.
+ *  - `envEntry.argsOverride === true` → env layer replaces global layer.
+ *  - `cliTokens` are the already-tokenized args from -c/-r/-n and the `--`
+ *    passthrough; they always merge on top (unless `only`, where they are all
+ *    that remains).
+ *
+ * `mergeArgs`/`overrideArg` are legacy inputs kept for `cce show`; the launch
+ * path no longer feeds them (the `-a`/`-A` flags were removed).
  */
-function buildLayers({ globalArgs = '', envEntry = null, mergeArgs = [], overrideArg = null } = {}) {
+function buildLayers({ globalArgs = '', envEntry = null, mergeArgs = [], overrideArg = null, cliTokens = [], only = false } = {}) {
   if (overrideArg !== null) {
     return [{ source: 'CLI -A', raw: overrideArg, tokens: tokenize(overrideArg) }];
   }
@@ -87,16 +93,19 @@ function buildLayers({ globalArgs = '', envEntry = null, mergeArgs = [], overrid
   const envArgs = envEntry?.args || '';
   const envOverride = envEntry?.argsOverride === true;
 
-  if (!envOverride && globalArgs) {
+  if (!only && !envOverride && globalArgs) {
     layers.push({ source: 'global', raw: globalArgs, tokens: tokenize(globalArgs) });
   }
-  if (envArgs) {
+  if (!only && envArgs) {
     layers.push({ source: 'env', raw: envArgs, tokens: tokenize(envArgs) });
   }
   for (const cli of mergeArgs) {
     if (cli !== '') {
       layers.push({ source: 'CLI -a', raw: cli, tokens: tokenize(cli) });
     }
+  }
+  if (cliTokens && cliTokens.length > 0) {
+    layers.push({ source: 'CLI', raw: quoteArgs(cliTokens), tokens: cliTokens.slice() });
   }
   return layers;
 }

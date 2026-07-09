@@ -52,7 +52,8 @@ async function pickFromConfig(cfg) {
 }
 
 /**
- * `cce pick [-a "..."] [-A "..."]` — show menu, then spawn claude with chosen env.
+ * `cce pick [-o] [-c] [-r [id]] [-n name] [-- claude args]` — show menu, then
+ * spawn claude with the chosen env.
  */
 async function run(args) {
   let parsed;
@@ -84,8 +85,8 @@ async function run(args) {
   // immediately, releasing claude's stdio and killing claude before it starts.
   require('../cli').launchClaudeWithEnv({
     envName: chosen,
-    mergeArgs: parsed.mergeArgs,
-    overrideArg: parsed.overrideArg,
+    cliTokens: parsed.cliTokens,
+    only: parsed.only,
     settingsMode: parsed.settingsMode,
     cfg,
   });
