@@ -4,6 +4,7 @@ npm-debug.log*
 Thumbs.db
 .idea/
 .vscode/
+.omx/
 *.log
 .env
 .env.local

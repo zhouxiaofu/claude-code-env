@@ -28,17 +28,21 @@ cce pick           # or pick from an interactive menu
 ```bash
 npm install -g @xiaofuzhou/cce   # requires Node ≥ 18, `claude` on PATH
 
-cce add            # pick a template from the menu (DeepSeek as an example):
-                   #   › deepseek  DeepSeek (Claude-compatible API)
-                   #     kimi      Moonshot Kimi K2.5
-                   #     glm5.2    Zhipu GLM-5.2
-                   #     mimo      Xiaomi MiMo pay-as-you-go API
-                   #     mimo-tp   Xiaomi MiMo Token Plan subscription
-                   # then paste your API key (from platform.deepseek.com) — everything else is preset
-cce                # launch Claude Code, already running on DeepSeek
+cce add            # Step 1: choose a provider
+                   #     claude   Claude official (through a local proxy)
+                   #     deepseek DeepSeek
+                   #   › glm      Zhipu GLM
+                   #     kimi     Kimi
+                   #     mimo     Xiaomi MiMo
+                   # Step 2: answer provider-specific prompts (GLM shown here)
+                   #   paste the API key
+                   #   choose a model: GLM-5.2 / GLM-5.1
+                   # Finally, confirm the suggested env name (such as glm-5.2)
+                   # and choose whether to make it the default
+cce                # launch Claude Code with the default env
 ```
 
-Base URL, model mapping, and the rest are preconfigured in the template — you only fill in the API key. `cce add deepseek` skips the menu; templates are fetched from GitHub and cached locally, managed with `cce template`.
+Each provider has one template entry. After you choose it, the template asks only for the relevant details: model (Kimi / GLM), plan (MiMo pay-as-you-go / Token Plan), local proxy port (official Claude), and API key. The base URL and model mappings are generated automatically, and the answers are used to suggest an env name. `cce add deepseek` skips the provider menu; templates are fetched from GitHub, cached locally, and managed with `cce template`.
 
 Prefer doing it by hand? `cce edit` opens the config file (`~/.claude/cce/config.json`):
 
@@ -46,6 +50,10 @@ Prefer doing it by hand? `cce edit` opens the config file (`~/.claude/cce/config
 {
   "version": 1,
   "default": "deepseek",
+  // Shared environment-variable base for every env
+  "env": {
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
   // Want to skip Claude Code's permission prompts every time? Add this line
   // (global — applies to every env):
   "args": "--permission-mode bypassPermissions",
@@ -62,7 +70,11 @@ Prefer doing it by hand? `cce edit` opens the config file (`~/.claude/cce/config
 }
 ```
 
-> `args` holds default flags passed to `claude` — the common one is `--permission-mode bypassPermissions` (skip permission prompts). At the top level it applies to every env; inside an env it applies to just that one. You can also append at launch with `cce -e deepseek -- ...`.
+### Shared env and default arguments
+
+The root-level `env` is a shared base for every configured env. A matching key in a specific env overrides it; set that key to `""` or `null` to remove the shared value for just that env. After the two layers are merged, the result still applies only to the `claude` child process launched by this command.
+
+`args` stores default flags passed to `claude`: root-level flags apply to every env, while flags inside a specific env apply only there. At launch, you can append more arguments or drop these defaults and use only the arguments from that invocation; see the `cce` launch options below.
 
 ---
 
@@ -84,21 +96,45 @@ They don't conflict — let cc-switch manage the global default and use cce for 
 
 ## Common commands
 
+### `cce`: launch Claude Code
+
+```text
+cce [launch options] [-- Claude arguments...]
+```
+
+Bare `cce` launches Claude Code with the default env. If no default is configured, it opens the env picker in an interactive terminal.
+
+| Launch option | Effect |
+|---|---|
+| `-e, --env <name>` | use a specific env instead of the default |
+| `-o, --only` | drop default `args` from the config and use only arguments from this invocation |
+| `-c, --continue` | continue the latest conversation |
+| `-r, --resume [id]` | resume by session ID, or omit the ID to let Claude prompt for one |
+| `-n, --name <name>` | set a display name for this session |
+| `-m, --merge-mode <mode>` | temporarily select the env merge mode: `override`, `cce`, or `claude` |
+| `-- <Claude arguments...>` | pass everything after `--` to Claude verbatim, appended after config defaults |
+
+For example:
+
+```bash
+cce -e kimi -c                              # continue the latest conversation with the kimi env
+cce -e kimi -- --permission-mode default    # append a Claude argument after config defaults
+cce -e kimi -o -- --resume XYZ              # drop config defaults and resume one session only
+```
+
+`-c`, `-r`, and `-n` can be combined with `-o` and `--`. Before `--`, use only cce launch options; put all other Claude arguments after it.
+
+### Management commands
+
 | Command | What it does |
 |---|---|
-| `cce` | launch claude with the default env |
-| `cce -e <name>` | launch with a specific env |
-| `cce pick` | interactive menu, then launch |
-| `cce add` / `cce remove` | create from template / delete an env |
-| `cce list` / `cce use <name>` | list envs / set the default |
-| `cce -e kimi -- --permission-mode bypassPermissions` | pass args after `--` to claude (merged with defaults) |
-| `cce -e kimi -o -- --resume XYZ` | `-o` drops config defaults, use only these |
-| `cce -e kimi -c` / `-n data` | common session flags, direct: continue / name a session |
+| `cce pick` | choose an env from a menu, then launch |
+| `cce add` / `cce remove` | create an env from a template / delete an env |
+| `cce list` / `cce show <name>` | list envs / inspect the effective config for one env |
+| `cce use <name>` / `cce current` | set / show the default env |
+| `cce edit` | edit the config file directly |
+| `cce template` | inspect, refresh, or configure template sources |
 | `cce update` | upgrade cce to the latest npm version |
-
-> ⚠ Claude CLI flags go after `--` (merged with your config defaults; add `-o` to drop the defaults). cce errors on flags it doesn't recognize *before* the `--`. The common `-c`/`-r`/`-n` are first-class cce flags, so they need no `--`.
->
-> Note: the old `-a "..."` / `-A "..."` are removed — use `--` / `-o` instead (cce prints the rewrite if you hit them).
 
 More under the hood: default-args management (global or per-env), three merge modes against `~/.claude/settings.json` (cce never edits that file), English/Chinese UI, Tab completion for four shells (including your env names), background self-update. See the docs:
 
