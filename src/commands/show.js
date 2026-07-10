@@ -33,29 +33,17 @@ function run(args) {
   const merged = mergeEntryEnv(globalEnv, entry.env);
   const masked = maskEnvObject(merged);
   const keys = Object.keys(masked).sort();
-  // Keys this env removes from the global layer ('' / null value).
-  const removed = Object.keys(entry.env || {})
-    .filter((k) => {
-      const v = entry.env[k];
-      return (v === '' || v === null || v === undefined) && (k in globalEnv);
-    })
-    .sort();
 
   if (keys.length === 0) {
     log.plain(pc.dim(t('show.envEmpty')));
   } else {
     const w = Math.max(...keys.map((k) => k.length));
     for (const k of keys) {
-      const v = (entry.env || {})[k];
-      const fromEnv = k in (entry.env || {}) && v !== '' && v != null;
+      const fromEnv = k in (entry.env || {});
       const suffix = hasGlobal ? `   ${pc.dim(fromEnv ? t('show.fromEnv') : t('show.fromGlobal'))}` : '';
-      log.plain(`  ${pc.cyan(k.padEnd(w))}  ${masked[k]}${suffix}`);
+      const value = merged[k] === '' ? '""' : masked[k];
+      log.plain(`  ${pc.cyan(k.padEnd(w))}  ${value}${suffix}`);
     }
-  }
-  if (removed.length > 0) {
-    log.plain('');
-    log.plain(pc.dim(t('show.envRemoved')));
-    for (const k of removed) log.plain(`  ${pc.dim('- ' + k)}`);
   }
 
   // --- settings.json env reconciliation mode ---

@@ -25,7 +25,7 @@
     },
     "env": {
       "type": "object",
-      "description": "Shared base environment variables injected under every env — for model-independent settings (e.g. CLAUDE_CODE_DISABLE_MOUSE_CLICKS, DISABLE_TELEMETRY). A selected env's `env` overrides these key-by-key; an empty-string or null value in the selected env removes the key (drops a global var for that env). Values may contain ${VAR} placeholders resolved from the parent shell env.",
+      "description": "Shared base environment variables injected under every env — for model-independent settings (e.g. CLAUDE_CODE_DISABLE_MOUSE_CLICKS, DISABLE_TELEMETRY). A selected env's `env` overrides these key-by-key. After merging, null is normalized to an empty string, explicitly clearing that key when the selected settings mode gives cce priority. Values may contain ${VAR} placeholders resolved from the parent shell env.",
       "additionalProperties": {
         "type": ["string", "null"]
       }
@@ -72,7 +72,7 @@
             },
             "env": {
               "type": "object",
-              "description": "Environment variables to inject into the claude child process. Matches the shape of Claude Code's settings.json `env` block, so values can be copy-pasted directly. Merged on top of the root-level `env` (this env wins per key). An empty-string or null value removes an inherited root `env` key. Values may contain ${VAR} placeholders resolved from the parent shell env.",
+              "description": "Environment variables to inject into the claude child process. Matches the shape of Claude Code's settings.json `env` block, so values can be copy-pasted directly. Merged on top of the root-level `env` (this env wins per key). After merging, null is normalized to an empty string, explicitly clearing that key when the selected settings mode gives cce priority. Values may contain ${VAR} placeholders resolved from the parent shell env.",
               "additionalProperties": {
                 "type": ["string", "null"]
               }

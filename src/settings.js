@@ -45,21 +45,16 @@ function readUserEnv() {
 
 /**
  * Merge the root/global `env` under a selected env's `env`. The selected env
- * overrides the global layer key-by-key; a value of '' / null / undefined in
- * the selected env REMOVES that key entirely — letting an env drop a global
- * var it doesn't want. Deletion keys off the raw value (before ${VAR}
- * expansion).
+ * overrides the global layer key-by-key. After merging, null is normalized to
+ * an empty string so it remains an explicit value that can neutralize the same
+ * key from settings.json when the selected settings mode gives cce priority.
  *
  * @returns {object} the merged env (raw values, not yet expanded)
  */
 function mergeEntryEnv(globalEnv = {}, entryEnv = {}) {
-  const merged = { ...(globalEnv || {}) };
-  for (const [k, v] of Object.entries(entryEnv || {})) {
-    if (v === '' || v === null || v === undefined) {
-      delete merged[k];
-    } else {
-      merged[k] = v;
-    }
+  const merged = { ...(globalEnv || {}), ...(entryEnv || {}) };
+  for (const [k, v] of Object.entries(merged)) {
+    if (v === null) merged[k] = '';
   }
   return merged;
 }
@@ -72,10 +67,10 @@ function mergeEntryEnv(globalEnv = {}, entryEnv = {}) {
  *
  * `globalEnv` (config root `env`) is merged under `entryEnv` first (see
  * mergeEntryEnv), then the result is ${VAR}-expanded and reconciled per mode:
- *   override     → tempEnv = entryEnv, plus stale anthropic keys present only
+ *   override     → tempEnv = merged cce env, plus stale anthropic keys present only
  *                  in userEnv get neutralized to "" (claude treats "" as unset).
- *   merge-cce    → tempEnv = entryEnv (entry wins; user-only keys fall through).
- *   merge-claude → tempEnv = entryEnv minus keys also in userEnv (so the user's
+ *   merge-cce    → tempEnv = merged cce env (cce wins; user-only keys fall through).
+ *   merge-claude → tempEnv = merged cce env minus keys also in userEnv (so the user's
  *                  settings.json value wins on every conflict).
  *
  * @returns {{ tempEnv: object, neutralized: string[] }}

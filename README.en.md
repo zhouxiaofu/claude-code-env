@@ -72,7 +72,7 @@ Prefer doing it by hand? `cce edit` opens the config file (`~/.claude/cce/config
 
 ### Shared env and default arguments
 
-The root-level `env` is a shared base for every configured env. A matching key in a specific env overrides it; set that key to `""` or `null` to remove the shared value for just that env. After the two layers are merged, the result still applies only to the `claude` child process launched by this command.
+The root-level `env` is a shared base for every configured env. A matching key in a specific env overrides it. After merging, `null` becomes an empty string, so both `null` and `""` explicitly clear a value. Whether that empty value overrides the same key in `settings.json` depends on `settingsMode`: CCE wins in `override` / `cce`, while `settings.json` wins in `claude`. The final result still applies only to the `claude` child process launched by this command.
 
 `args` stores default flags passed to `claude`: root-level flags apply to every env, while flags inside a specific env apply only there. At launch, you can append more arguments or drop these defaults and use only the arguments from that invocation; see the `cce` launch options below.
 

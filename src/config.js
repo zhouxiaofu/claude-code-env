@@ -126,8 +126,8 @@ function normalize(cfg) {
       out.args = cfg.args;
     }
     // Root-level `env`: shared base env vars injected under every env. A
-    // selected env's `env` overrides these key-by-key; an '' / null value in
-    // the selected env removes the key (drops a global var for that env).
+    // selected env's `env` overrides these key-by-key. null is normalized to
+    // '' after merging so it explicitly clears that key when cce has priority.
     if (cfg.env && typeof cfg.env === 'object') {
       out.env = { ...cfg.env };
     }

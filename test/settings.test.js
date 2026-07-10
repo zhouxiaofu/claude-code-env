@@ -65,12 +65,12 @@ test('no settings.json env + merge mode = empty temp env (no --settings needed)'
 
 // --- root/global env layer ---
 
-test('mergeEntryEnv: entry overrides global, empty/null removes global key', () => {
+test('mergeEntryEnv: entry overrides global, empty/null explicitly clear keys', () => {
   const merged = mergeEntryEnv(
     { A: '1', B: '2', C: '3', D: '4' },
     { B: 'two', C: '', D: null, E: 'five' },
   );
-  assert.deepStrictEqual(merged, { A: '1', B: 'two', E: 'five' }); // C, D removed
+  assert.deepStrictEqual(merged, { A: '1', B: 'two', C: '', D: '', E: 'five' });
 });
 
 test('global env injected under entry (merge-cce)', () => {
@@ -87,7 +87,7 @@ test('global env injected under entry (merge-cce)', () => {
   });
 });
 
-test('entry with "" removes a global key so it is not injected', () => {
+test('entry with "" explicitly clears a global key', () => {
   const { tempEnv } = reconcileEnv({
     entryEnv: { CLAUDE_CODE_DISABLE_MOUSE_CLICKS: '' },
     globalEnv: { CLAUDE_CODE_DISABLE_MOUSE_CLICKS: '1', DISABLE_TELEMETRY: '1' },
@@ -95,7 +95,43 @@ test('entry with "" removes a global key so it is not injected', () => {
     mode: 'merge-cce',
     parentEnv: {},
   });
-  assert.deepStrictEqual(tempEnv, { DISABLE_TELEMETRY: '1' });
+  assert.deepStrictEqual(tempEnv, {
+    CLAUDE_CODE_DISABLE_MOUSE_CLICKS: '',
+    DISABLE_TELEMETRY: '1',
+  });
+});
+
+test('null/empty values follow settingsMode conflict precedence', () => {
+  const common = {
+    entryEnv: { SHARED: null, EMPTY: '' },
+    globalEnv: { SHARED: 'from-global' },
+    userEnv: { SHARED: 'from-settings', EMPTY: 'from-settings' },
+    parentEnv: {},
+  };
+
+  assert.deepStrictEqual(
+    reconcileEnv({ ...common, mode: 'override' }).tempEnv,
+    { SHARED: '', EMPTY: '' },
+  );
+  assert.deepStrictEqual(
+    reconcileEnv({ ...common, mode: 'merge-cce' }).tempEnv,
+    { SHARED: '', EMPTY: '' },
+  );
+  assert.deepStrictEqual(
+    reconcileEnv({ ...common, mode: 'merge-claude' }).tempEnv,
+    {},
+  );
+});
+
+test('root-level null is normalized to an explicit empty string', () => {
+  const { tempEnv } = reconcileEnv({
+    globalEnv: { SHARED: null },
+    entryEnv: {},
+    userEnv: {},
+    mode: 'merge-cce',
+    parentEnv: {},
+  });
+  assert.deepStrictEqual(tempEnv, { SHARED: '' });
 });
 
 test('global env values are ${VAR}-expanded too', () => {
