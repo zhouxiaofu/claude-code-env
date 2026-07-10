@@ -53,6 +53,7 @@ module.exports = {
   'show.envHeader': 'Env: {name}',
   'show.envVars': 'Environment variables:',
   'show.envEmpty': '(empty — no env injection)',
+  'show.envRemoved': 'Removed from the global env by this env:',
   'show.claudeArgs': 'Claude args (config):',
   'show.argsEmpty': '(no defaults — claude launches with no extra args)',
   'show.fromGlobal': '(from global)',

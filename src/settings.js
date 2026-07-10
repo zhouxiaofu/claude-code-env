@@ -44,12 +44,34 @@ function readUserEnv() {
 }
 
 /**
+ * Merge the root/global `env` under a selected env's `env`. The selected env
+ * overrides the global layer key-by-key; a value of '' / null / undefined in
+ * the selected env REMOVES that key entirely — letting an env drop a global
+ * var it doesn't want. Deletion keys off the raw value (before ${VAR}
+ * expansion).
+ *
+ * @returns {object} the merged env (raw values, not yet expanded)
+ */
+function mergeEntryEnv(globalEnv = {}, entryEnv = {}) {
+  const merged = { ...(globalEnv || {}) };
+  for (const [k, v] of Object.entries(entryEnv || {})) {
+    if (v === '' || v === null || v === undefined) {
+      delete merged[k];
+    } else {
+      merged[k] = v;
+    }
+  }
+  return merged;
+}
+
+/**
  * Compute the `env` object to write into the temp settings file that is passed
  * to `claude --settings`. That file is a HIGHER-precedence layer that MERGES
  * over the user's ~/.claude/settings.json, so for any key:
  *   effective[k] = (k in tempEnv) ? tempEnv[k] : userEnv[k]
  *
- * Modes (entryEnv = the selected cce env's env, already ${VAR}-expanded):
+ * `globalEnv` (config root `env`) is merged under `entryEnv` first (see
+ * mergeEntryEnv), then the result is ${VAR}-expanded and reconciled per mode:
  *   override     → tempEnv = entryEnv, plus stale anthropic keys present only
  *                  in userEnv get neutralized to "" (claude treats "" as unset).
  *   merge-cce    → tempEnv = entryEnv (entry wins; user-only keys fall through).
@@ -58,9 +80,10 @@ function readUserEnv() {
  *
  * @returns {{ tempEnv: object, neutralized: string[] }}
  */
-function reconcileEnv({ entryEnv = {}, userEnv = {}, mode = config.DEFAULT_SETTINGS_MODE, parentEnv = process.env }) {
+function reconcileEnv({ entryEnv = {}, globalEnv = {}, userEnv = {}, mode = config.DEFAULT_SETTINGS_MODE, parentEnv = process.env }) {
+  const merged = mergeEntryEnv(globalEnv, entryEnv);
   const expanded = {};
-  for (const [k, v] of Object.entries(entryEnv || {})) {
+  for (const [k, v] of Object.entries(merged)) {
     expanded[k] = expandEnvVars(v, parentEnv);
   }
 
@@ -145,10 +168,10 @@ function sweepOrphans() {
  * the keys that were neutralized. Returns { file: null } when nothing needs to
  * be written (then no `--settings` flag should be added).
  */
-function prepareSettings({ entry, mode, parentEnv = process.env }) {
+function prepareSettings({ entry, globalEnv = {}, mode, parentEnv = process.env }) {
   const entryEnv = (entry && entry.env) || {};
   const userEnv = readUserEnv();
-  const { tempEnv, neutralized } = reconcileEnv({ entryEnv, userEnv, mode, parentEnv });
+  const { tempEnv, neutralized } = reconcileEnv({ entryEnv, globalEnv, userEnv, mode, parentEnv });
 
   if (Object.keys(tempEnv).length === 0) {
     return { file: null, neutralized, tempEnv };
@@ -160,6 +183,7 @@ function prepareSettings({ entry, mode, parentEnv = process.env }) {
 module.exports = {
   getTmpDir,
   readUserEnv,
+  mergeEntryEnv,
   reconcileEnv,
   writeTempSettings,
   cleanupTempSettings,

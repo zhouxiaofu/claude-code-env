@@ -150,7 +150,7 @@ function launchClaudeWithEnv({ envName, cliTokens = [], only = false, settingsMo
   let tempSettingsFile = null;
   const settingsArgs = [];
   if (entry) {
-    const prep = settings.prepareSettings({ entry, mode, parentEnv: process.env });
+    const prep = settings.prepareSettings({ entry, globalEnv: cfg.env || {}, mode, parentEnv: process.env });
     tempSettingsFile = prep.file;
     if (prep.file) {
       settingsArgs.push('--settings', prep.file);

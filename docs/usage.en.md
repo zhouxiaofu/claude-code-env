@@ -284,6 +284,7 @@ conventions). The first run writes a starter config if none exists.
 | `default` | string \| null | no | Env name used when `cce` is run with no `-e`. `null`/missing → bare `cce` opens the picker (TTY) or launches without injection (non-TTY). |
 | `lang` | `"en"` \| `"zh-CN"` \| null | no | UI language. `null` = auto-detect from OS locale. Overridden by `CCE_LANG`; set with `cce lang`. |
 | `args` | string | no | **Global** default claude CLI args (shell-tokenized). Prepended to every launch. |
+| `env` | object | no | **Globally shared** base env vars, injected under every env — for model-independent settings (e.g. `CLAUDE_CODE_DISABLE_MOUSE_CLICKS`, `DISABLE_TELEMETRY`). A selected env's `env` overrides these key-by-key; an **empty-string or `null`** value in the selected env **removes** that key (lets an env drop a global var). Values may contain `${VAR}`. |
 | `settingsMode` | `"override"` \| `"merge-cce"` \| `"merge-claude"` | no | **Global** default reconciliation mode. Default `override`. |
 | `updateMode` | `"auto"` \| `"prompt"` \| `"off"` | no | How self-update behaves at launch. Default `auto`. See [Updating cce](#updating-cce). |
 | `template` | object | no | Template source settings. Prefer managing via `cce template url` / `cce template offline` over hand-editing. |
@@ -291,7 +292,7 @@ conventions). The first run writes a starter config if none exists.
 | `template.offline` | boolean | no | Default `false`. When `true`, `cce add` never hits the network: it uses the local cache `templates.remote.json` and skips the 24h TTL check. |
 | `envs.<name>` | object | yes | A named env. The key is what you pass to `-e`. Must match `[A-Za-z0-9][A-Za-z0-9._-]*`. |
 | `envs.<name>.description` | string | no | Shown in `cce list` and `cce show`. |
-| `envs.<name>.env` | object | yes | Env vars injected for this provider. Same shape as claude's `settings.json` `env` block. Values may contain `${VAR}` placeholders, resolved from the parent shell at launch. |
+| `envs.<name>.env` | object | yes | Env vars injected for this provider. Same shape as claude's `settings.json` `env` block. Merged on top of the root-level `env` (this env wins per key); an empty-string or `null` value removes an inherited root `env` key. Values may contain `${VAR}` placeholders, resolved from the parent shell at launch. |
 | `envs.<name>.args` | string | no | Per-env claude args. Merged onto global `args` by default. |
 | `envs.<name>.argsOverride` | boolean | no | Default `false`. If `true`, this env's `args` **replace** the global `args`. |
 | `envs.<name>.settingsMode` | enum | no | Per-env reconciliation mode. Omit to inherit the global `settingsMode`. |
@@ -306,6 +307,13 @@ conventions). The first run writes a starter config if none exists.
 
   // UI language: null = auto-detect. Set with `cce lang en|zh-CN|auto`.
   "lang": null,
+
+  // Globally shared env base — injected under every env (model-independent settings).
+  // A selected env's `env` overrides per key; set a key to "" or null to remove it.
+  "env": {
+    "CLAUDE_CODE_DISABLE_MOUSE_CLICKS": "1",
+    "DISABLE_TELEMETRY": "1"
+  },
 
   // Global default claude args — applied to every launch.
   // Skip them for one run with `-o`.

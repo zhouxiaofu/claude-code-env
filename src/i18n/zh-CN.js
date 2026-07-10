@@ -51,6 +51,7 @@ module.exports = {
   'show.envHeader': 'Env：{name}',
   'show.envVars': '环境变量：',
   'show.envEmpty': '（空 —— 不注入任何 env）',
+  'show.envRemoved': '此 env 从全局 env 中移除的键：',
   'show.claudeArgs': 'Claude 参数（配置）：',
   'show.argsEmpty': '（无默认参数 —— claude 不带额外参数启动）',
   'show.fromGlobal': '（来自全局）',

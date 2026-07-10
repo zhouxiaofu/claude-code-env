@@ -70,6 +70,7 @@ function defaultConfig() {
     default: null,
     lang: null,
     args: '',
+    env: {},
     settingsMode: DEFAULT_SETTINGS_MODE,
     updateMode: DEFAULT_UPDATE_MODE,
     template: { url: null, offline: false },
@@ -123,6 +124,12 @@ function normalize(cfg) {
     }
     if (typeof cfg.args === 'string') {
       out.args = cfg.args;
+    }
+    // Root-level `env`: shared base env vars injected under every env. A
+    // selected env's `env` overrides these key-by-key; an '' / null value in
+    // the selected env removes the key (drops a global var for that env).
+    if (cfg.env && typeof cfg.env === 'object') {
+      out.env = { ...cfg.env };
     }
     const rootMode = normalizeMode(cfg.settingsMode);
     if (rootMode) out.settingsMode = rootMode;

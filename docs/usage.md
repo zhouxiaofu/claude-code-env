@@ -274,6 +274,7 @@ cce template offline off     # 关闭离线
 | `default` | string \| null | 否 | `cce` 不带 `-e` 时使用的 env 名。`null`/缺省 → 裸 `cce` 在 TTY 下打开选择器，非 TTY 下不注入直接启动。 |
 | `lang` | `"en"` \| `"zh-CN"` \| null | 否 | 界面语言。`null` = 从系统 locale 自动检测。可被 `CCE_LANG` 覆盖；用 `cce lang` 设置。 |
 | `args` | string | 否 | **全局**默认 claude CLI 参数（shell 分词）。前置注入到每次启动。 |
+| `env` | object | 否 | **全局共享**的环境变量基底，注入到每个 env 之下——用于与模型无关的设置（如 `CLAUDE_CODE_DISABLE_MOUSE_CLICKS`、`DISABLE_TELEMETRY`）。选中 env 的 `env` 逐 key 覆盖它；选中 env 里某 key 的值为**空字符串或 `null`** 则**移除**该 key（让某个 env 去掉某个全局变量）。值可含 `${VAR}`。 |
 | `settingsMode` | `"override"` \| `"merge-cce"` \| `"merge-claude"` | 否 | **全局**默认合并模式。默认 `override`。 |
 | `updateMode` | `"auto"` \| `"prompt"` \| `"off"` | 否 | 启动时如何处理自我更新。默认 `auto`。见 [更新 cce](#更新-cce)。 |
 | `template` | object | 否 | 模板来源设置。建议用 `cce template url` / `cce template offline` 管理，而非手改。 |
@@ -281,7 +282,7 @@ cce template offline off     # 关闭离线
 | `template.offline` | boolean | 否 | 默认 `false`。为 `true` 时 `cce add` 永不联网：直接用本地缓存 `templates.remote.json`，且跳过 24h 过期检查。 |
 | `envs.<name>` | object | 是 | 一个命名 env。键名就是你传给 `-e` 的值。必须匹配 `[A-Za-z0-9][A-Za-z0-9._-]*`。 |
 | `envs.<name>.description` | string | 否 | 在 `cce list` 和 `cce show` 中展示。 |
-| `envs.<name>.env` | object | 是 | 为该服务商注入的环境变量。结构与 claude `settings.json` 的 `env` 块一致。值可含 `${VAR}` 占位符，启动时从你命令行环境里解析。 |
+| `envs.<name>.env` | object | 是 | 为该服务商注入的环境变量。结构与 claude `settings.json` 的 `env` 块一致。合并在根级 `env` 之上（本 env 逐 key 优先）；某 key 值为空字符串或 `null` 则移除继承自根级 `env` 的该 key。值可含 `${VAR}` 占位符，启动时从你命令行环境里解析。 |
 | `envs.<name>.args` | string | 否 | 该 env 的 claude 参数。默认合并到全局 `args` 之上。 |
 | `envs.<name>.argsOverride` | boolean | 否 | 默认 `false`。为 `true` 时，该 env 的 `args` **替换**全局 `args`。 |
 | `envs.<name>.settingsMode` | enum | 否 | 该 env 的合并模式覆盖。省略则继承全局 `settingsMode`。 |
@@ -300,6 +301,13 @@ cce template offline off     # 关闭离线
   // 全局默认 claude 参数 —— 应用到每次启动。
   // 想为某次启动跳过它们，用 `-o`。
   "args": "--permission-mode bypassPermissions",
+
+  // 全局共享 env 基底 —— 注入到每个 env 之下（与模型无关的设置放这里）。
+  // 选中 env 的 `env` 逐 key 覆盖；把某 key 设为 "" 或 null 则移除它。
+  "env": {
+    "CLAUDE_CODE_DISABLE_MOUSE_CLICKS": "1",
+    "DISABLE_TELEMETRY": "1"
+  },
 
   // 全局默认：env 的 `env` 如何与 ~/.claude/settings.json 合并。
   "settingsMode": "override",

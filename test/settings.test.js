@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert');
 
-const { reconcileEnv } = require('../src/settings');
+const { reconcileEnv, mergeEntryEnv } = require('../src/settings');
 
 const userEnv = {
   ANTHROPIC_BASE_URL: 'https://USER',
@@ -61,4 +61,50 @@ test('${VAR} placeholders are expanded from parentEnv', () => {
 test('no settings.json env + merge mode = empty temp env (no --settings needed)', () => {
   const { tempEnv } = reconcileEnv({ entryEnv: {}, userEnv: {}, mode: 'merge-cce', parentEnv: {} });
   assert.deepStrictEqual(tempEnv, {});
+});
+
+// --- root/global env layer ---
+
+test('mergeEntryEnv: entry overrides global, empty/null removes global key', () => {
+  const merged = mergeEntryEnv(
+    { A: '1', B: '2', C: '3', D: '4' },
+    { B: 'two', C: '', D: null, E: 'five' },
+  );
+  assert.deepStrictEqual(merged, { A: '1', B: 'two', E: 'five' }); // C, D removed
+});
+
+test('global env injected under entry (merge-cce)', () => {
+  const { tempEnv } = reconcileEnv({
+    entryEnv: { ANTHROPIC_MODEL: 'kimi' },
+    globalEnv: { CLAUDE_CODE_DISABLE_MOUSE_CLICKS: '1' },
+    userEnv: {},
+    mode: 'merge-cce',
+    parentEnv: {},
+  });
+  assert.deepStrictEqual(tempEnv, {
+    CLAUDE_CODE_DISABLE_MOUSE_CLICKS: '1',
+    ANTHROPIC_MODEL: 'kimi',
+  });
+});
+
+test('entry with "" removes a global key so it is not injected', () => {
+  const { tempEnv } = reconcileEnv({
+    entryEnv: { CLAUDE_CODE_DISABLE_MOUSE_CLICKS: '' },
+    globalEnv: { CLAUDE_CODE_DISABLE_MOUSE_CLICKS: '1', DISABLE_TELEMETRY: '1' },
+    userEnv: {},
+    mode: 'merge-cce',
+    parentEnv: {},
+  });
+  assert.deepStrictEqual(tempEnv, { DISABLE_TELEMETRY: '1' });
+});
+
+test('global env values are ${VAR}-expanded too', () => {
+  const { tempEnv } = reconcileEnv({
+    entryEnv: {},
+    globalEnv: { SHARED: '${MYVAL}' },
+    userEnv: {},
+    mode: 'merge-cce',
+    parentEnv: { MYVAL: 'xyz' },
+  });
+  assert.strictEqual(tempEnv.SHARED, 'xyz');
 });
