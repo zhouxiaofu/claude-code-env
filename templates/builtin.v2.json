@@ -77,6 +77,20 @@
         "name": "model",
         "description": { "en": "Model", "zh-CN": "模型" },
         "options": [
+          {
+            "name": "kimi-k3[1m]",
+            "label": { "en": "Kimi K3 (1M context)", "zh-CN": "Kimi K3（1M 上下文）" },
+            "inputs": [
+              {
+                "type": "const",
+                "env": {
+                  "ANTHROPIC_DEFAULT_FABLE_MODEL": "kimi-k3[1m]",
+                  "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1048576",
+                  "CLAUDE_CODE_EFFORT_LEVEL": "max"
+                }
+              }
+            ]
+          },
           { "name": "kimi-k2.7-code", "label": { "en": "Kimi K2.7 Code", "zh-CN": "Kimi K2.7 Code" } },
           { "name": "kimi-k2.6", "label": { "en": "Kimi K2.6", "zh-CN": "Kimi K2.6" } }
         ]

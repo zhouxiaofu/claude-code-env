@@ -76,6 +76,22 @@ test('normalizeTemplate parses the v2 inputs tree, dropping malformed nodes', ()
   assert.strictEqual(tpl.source, 'file.json');
 });
 
+test('builtin v2 Kimi K3 option carries its model-specific 1M settings', () => {
+  const file = path.join(__dirname, '..', 'templates', 'builtin.v2.json');
+  const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const kimi = templates.normalizeTemplate('kimi', raw.kimi, file);
+  const modelSelect = kimi.inputs.find((node) => node.type === 'select' && node.name === 'model');
+  const k3 = modelSelect.options.find((option) => option.name === 'kimi-k3[1m]');
+  const k3Env = k3.inputs.find((node) => node.type === 'const').env;
+
+  assert.strictEqual(kimi.env.ANTHROPIC_MODEL, '${model}');
+  assert.deepStrictEqual(k3Env, {
+    ANTHROPIC_DEFAULT_FABLE_MODEL: 'kimi-k3[1m]',
+    CLAUDE_CODE_AUTO_COMPACT_WINDOW: '1048576',
+    CLAUDE_CODE_EFFORT_LEVEL: 'max',
+  });
+});
+
 test('substituteUrlVars resolves ${version}, passes plain URLs, rejects unknown vars', () => {
   const v = String(templates.TEMPLATE_SCHEMA_VERSION);
   assert.strictEqual(
